@@ -1,13 +1,12 @@
 ﻿using System;
 using System.IO;
 using Microsoft.WindowsAzure.Storage;
-using Rebus.AzureQueues;
 using Rebus.AzureQueues.Transport;
 using Rebus.Config;
 using Rebus.Exceptions;
 using Rebus.Logging;
 
-namespace Rebus.AzureStorage.Tests
+namespace Rebus.AzureQueues.Tests
 {
     public class AzureStorageFactoryBase
     {

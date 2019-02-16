@@ -9,10 +9,11 @@ using Rebus.Config;
 using Rebus.Logging;
 using Rebus.Tests.Contracts;
 using Rebus.Tests.Contracts.Utilities;
+
 // ReSharper disable ArgumentsStyleNamedExpression
 #pragma warning disable 1998
 
-namespace Rebus.AzureStorage.Tests.Transport
+namespace Rebus.AzureQueues.Tests.Transport
 {
     [TestFixture]
     public class TestPrefetch : FixtureBase

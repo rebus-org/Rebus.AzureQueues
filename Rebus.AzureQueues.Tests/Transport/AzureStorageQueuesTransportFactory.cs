@@ -6,7 +6,7 @@ using Rebus.Logging;
 using Rebus.Tests.Contracts.Transports;
 using Rebus.Transport;
 
-namespace Rebus.AzureStorage.Tests.Transport
+namespace Rebus.AzureQueues.Tests.Transport
 {
     public class AzureStorageQueuesTransportFactory : ITransportFactory
     {

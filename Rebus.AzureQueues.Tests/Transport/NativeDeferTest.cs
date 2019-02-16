@@ -9,9 +9,10 @@ using Rebus.Messages;
 using Rebus.Routing.TypeBased;
 using Rebus.Tests.Contracts;
 using Rebus.Tests.Contracts.Extensions;
+
 #pragma warning disable 1998
 
-namespace Rebus.AzureStorage.Tests.Transport
+namespace Rebus.AzureQueues.Tests.Transport
 {
     [TestFixture]
     public class NativeDeferTest : FixtureBase

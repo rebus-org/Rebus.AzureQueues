@@ -3,7 +3,7 @@ using System.IO;
 using Microsoft.WindowsAzure.Storage;
 using Rebus.Exceptions;
 
-namespace Rebus.AzureStorage.Tests
+namespace Rebus.AzureQueues.Tests
 {
     public static class AzureConfig
     {

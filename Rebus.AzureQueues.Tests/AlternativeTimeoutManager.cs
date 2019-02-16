@@ -9,9 +9,10 @@ using Rebus.Persistence.InMem;
 using Rebus.Tests.Contracts;
 using Rebus.Tests.Contracts.Extensions;
 using Rebus.Timeouts;
+
 // ReSharper disable ArgumentsStyleNamedExpression
 
-namespace Rebus.AzureStorage.Tests
+namespace Rebus.AzureQueues.Tests
 {
     [TestFixture]
     public class AlternativeTimeoutManager : FixtureBase

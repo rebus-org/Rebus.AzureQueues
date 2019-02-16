@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Rebus.AzureStorage.Tests.Extensions
+namespace Rebus.AzureQueues.Tests.Extensions
 {
     static class TestEx
     {

@@ -3,8 +3,8 @@
  <PropertyGroup>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>Rebus.AzureStorage.Tests</RootNamespace>
-    <AssemblyName>Rebus.AzureStorage.Tests</AssemblyName>
+    <RootNamespace>Rebus.AzureQueues.Tests</RootNamespace>
+    <AssemblyName>Rebus.AzureQueues.Tests</AssemblyName>
     <TargetFrameworks>net461;netcoreapp2.1</TargetFrameworks>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
   </PropertyGroup>
