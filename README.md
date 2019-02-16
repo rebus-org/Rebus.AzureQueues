@@ -3,7 +3,7 @@
 [![install from nuget](https://img.shields.io/nuget/v/Rebus.AzureQueues.svg?style=flat-square)](https://www.nuget.org/packages/Rebus.AzureQueues)
 
 
-Provides an Azure Storage-based transport implementation for [Rebus](https://github.com/rebus-org/Rebus).
+Provides an Azure Storage Queues-based transport implementation for [Rebus](https://github.com/rebus-org/Rebus).
 
 
 
