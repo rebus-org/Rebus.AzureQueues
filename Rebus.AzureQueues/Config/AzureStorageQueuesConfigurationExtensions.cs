@@ -1,5 +1,6 @@
 ﻿using System;
 using Microsoft.WindowsAzure.Storage;
+using Microsoft.WindowsAzure.Storage.Queue;
 using Rebus.AzureQueues;
 using Rebus.AzureQueues.Transport;
 using Rebus.Logging;
@@ -66,22 +67,48 @@ Configure.With(...)
         /// <summary>
         /// Configures Rebus to use Azure Storage Queues to transport messages
         /// </summary>
+        public static void UseAzureStorageQueues(this StandardConfigurer<ITransport> configurer, ICloudQueueFactory queueFactory, string inputQueueAddress, AzureStorageQueuesTransportOptions options = null)
+        {
+            Register(configurer, inputQueueAddress, queueFactory, options);
+        }
+
+        /// <summary>
+        /// Configures Rebus to use Azure Storage Queues to transport messages as a one-way client (i.e. will not be able to receive any messages)
+        /// </summary>
+        public static void UseAzureStorageQueuesAsOneWayClient(this StandardConfigurer<ITransport> configurer, ICloudQueueFactory queueFactory, AzureStorageQueuesTransportOptions options = null)
+        {
+            Register(configurer, null, queueFactory, options);
+
+            OneWayClientBackdoor.ConfigureOneWayClient(configurer);
+        }
+
+        /// <summary>
+        /// Configures Rebus to use Azure Storage Queues to transport messages
+        /// </summary>
         public static void UseAzureStorageQueues(this StandardConfigurer<ITransport> configurer, CloudStorageAccount storageAccount, string inputQueueAddress, AzureStorageQueuesTransportOptions options = null)
         {
             Register(configurer, inputQueueAddress, storageAccount, options);
         }
 
-        static void Register(StandardConfigurer<ITransport> configurer, string inputQueueAddress, CloudStorageAccount storageAccount, AzureStorageQueuesTransportOptions optionsOrNull)
+
+        static void Register(StandardConfigurer<ITransport> configurer, string inputQueueAddress,
+            CloudStorageAccount cloudStorageAccount, AzureStorageQueuesTransportOptions optionsOrNull)
+        {
+            var queueFactory = new CloudQueueClientQueueFactory(cloudStorageAccount.CreateCloudQueueClient());
+            Register(configurer, inputQueueAddress, queueFactory, optionsOrNull);
+        }
+
+        static void Register(StandardConfigurer<ITransport> configurer, string inputQueueAddress, ICloudQueueFactory queueFactory, AzureStorageQueuesTransportOptions optionsOrNull)
         {
             if (configurer == null) throw new ArgumentNullException(nameof(configurer));
-            if (storageAccount == null) throw new ArgumentNullException(nameof(storageAccount));
+            if (queueFactory == null) throw new ArgumentNullException(nameof(queueFactory));
 
             var options = optionsOrNull ?? new AzureStorageQueuesTransportOptions();
 
             configurer.Register(c =>
             {
                 var rebusLoggerFactory = c.Get<IRebusLoggerFactory>();
-                return new AzureStorageQueuesTransport(storageAccount, inputQueueAddress, rebusLoggerFactory, options);
+                return new AzureStorageQueuesTransport(queueFactory, inputQueueAddress, rebusLoggerFactory, options);
             });
 
             if (options.UseNativeDeferredMessages)
