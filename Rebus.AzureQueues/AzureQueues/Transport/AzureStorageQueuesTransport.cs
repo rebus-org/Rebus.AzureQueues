@@ -323,7 +323,7 @@ namespace Rebus.AzureQueues.Transport
             {
                 var queue = GetQueue(Address);
 
-                if (await queue.ExistsAsync()) return;
+                if (!await queue.ExistsAsync()) return;
 
                 _log.Info("Purging storage queue '{0}' (purging by deleting all messages)", Address);
 
