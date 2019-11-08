@@ -35,11 +35,11 @@ namespace Rebus.AzureQueues.Transport
         readonly ConcurrentDictionary<string, CloudQueue> _queues = new ConcurrentDictionary<string, CloudQueue>();
         readonly ConcurrentQueue<CloudQueueMessage> _prefetchedMessages = new ConcurrentQueue<CloudQueueMessage>();
         readonly TimeSpan _initialVisibilityDelay;
-        readonly CloudQueueClient _queueClient;
         readonly ILog _log;
+        readonly ICloudQueueFactory _queueFactory;
 
         /// <summary>
-        /// Constructs the transport
+        /// Constructs the transport using a <see cref="CloudStorageAccount"/>
         /// </summary>
         public AzureStorageQueuesTransport(CloudStorageAccount storageAccount, string inputQueueName, IRebusLoggerFactory rebusLoggerFactory, AzureStorageQueuesTransportOptions options)
         {
@@ -47,9 +47,34 @@ namespace Rebus.AzureQueues.Transport
             if (rebusLoggerFactory == null) throw new ArgumentNullException(nameof(rebusLoggerFactory));
 
             _options = options;
-            _queueClient = storageAccount.CreateCloudQueueClient();
             _log = rebusLoggerFactory.GetLogger<AzureStorageQueuesTransport>();
             _initialVisibilityDelay = options.InitialVisibilityDelay;
+
+            var queueClient = storageAccount.CreateCloudQueueClient();
+            _queueFactory = new CloudQueueClientQueueFactory(queueClient);
+
+            if (inputQueueName != null)
+            {
+                if (!Regex.IsMatch(inputQueueName, QueueNameValidationRegex))
+                {
+                    throw new ArgumentException($"The inputQueueName {inputQueueName} is not valid - it can contain only alphanumeric characters and hyphens, and must not have 2 consecutive hyphens.", nameof(inputQueueName));
+                }
+                Address = inputQueueName.ToLowerInvariant();
+            }
+        }
+        
+        /// <summary>
+        /// Constructs the transport using a <see cref="ICloudQueueFactory"/>
+        /// </summary>
+        public AzureStorageQueuesTransport(ICloudQueueFactory queueFactory, string inputQueueName, IRebusLoggerFactory rebusLoggerFactory, AzureStorageQueuesTransportOptions options)
+        {
+            if (queueFactory == null) throw new ArgumentNullException(nameof(queueFactory));
+            if (rebusLoggerFactory == null) throw new ArgumentNullException(nameof(rebusLoggerFactory));
+
+            _options = options;
+            _log = rebusLoggerFactory.GetLogger<AzureStorageQueuesTransport>();
+            _initialVisibilityDelay = options.InitialVisibilityDelay;
+            _queueFactory = queueFactory;
 
             if (inputQueueName != null)
             {
@@ -66,9 +91,11 @@ namespace Rebus.AzureQueues.Transport
         /// </summary>
         public void CreateQueue(string address)
         {
-            var queue = GetQueue(address);
-
-            AsyncHelpers.RunSync(() => queue.CreateIfNotExistsAsync());
+            AsyncHelpers.RunSync(async () =>
+            {
+                var queue = await _queueFactory.GetQueue(address);
+                await queue.CreateIfNotExistsAsync();
+            });
         }
 
         /// <summary>
@@ -89,7 +116,7 @@ namespace Rebus.AzureQueues.Transport
                     return Task.WhenAll(messagesByQueue.Select(async batch =>
                     {
                         var queueName = batch.Key;
-                        var queue = GetQueue(queueName);
+                        var queue = await _queueFactory.GetQueue(queueName);
 
                         await Task.WhenAll(batch.Select(async message =>
                         {
@@ -150,7 +177,7 @@ namespace Rebus.AzureQueues.Transport
                 throw new InvalidOperationException("This Azure Storage Queues transport does not have an input queue, hence it is not possible to receive anything");
             }
 
-            var inputQueue = GetQueue(Address);
+            var inputQueue = await _queueFactory.GetQueue(Address);
 
             if (_prefetchedMessages.TryDequeue(out var dequeuedMessage))
             {
@@ -310,9 +337,7 @@ namespace Rebus.AzureQueues.Transport
 
             _log.Info("Initializing one-way Azure Storage Queues transport");
         }
-
-        CloudQueue GetQueue(string address) => _queues.GetOrAdd(address, _ => _queueClient.GetQueueReference(address));
-
+        
         /// <summary>
         /// Purges the input queue (WARNING: potentially very slow operation, as it will continue to batch receive messages until the queue is empty
         /// </summary>
@@ -321,7 +346,7 @@ namespace Rebus.AzureQueues.Transport
         {
             AsyncHelpers.RunSync(async () =>
             {
-                var queue = GetQueue(Address);
+                var queue = await _queueFactory.GetQueue(Address);
 
                 if (!await queue.ExistsAsync()) return;
 
