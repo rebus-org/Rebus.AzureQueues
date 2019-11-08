@@ -68,13 +68,12 @@ namespace Rebus.AzureQueues.Transport
         /// </summary>
         public AzureStorageQueuesTransport(ICloudQueueFactory queueFactory, string inputQueueName, IRebusLoggerFactory rebusLoggerFactory, AzureStorageQueuesTransportOptions options)
         {
-            if (queueFactory == null) throw new ArgumentNullException(nameof(queueFactory));
             if (rebusLoggerFactory == null) throw new ArgumentNullException(nameof(rebusLoggerFactory));
 
             _options = options;
             _log = rebusLoggerFactory.GetLogger<AzureStorageQueuesTransport>();
             _initialVisibilityDelay = options.InitialVisibilityDelay;
-            _queueFactory = queueFactory;
+            _queueFactory = queueFactory ?? throw new ArgumentNullException(nameof(queueFactory));
 
             if (inputQueueName != null)
             {

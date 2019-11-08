@@ -1,7 +1,9 @@
 ﻿using System;
 using System.IO;
 using Microsoft.WindowsAzure.Storage;
-using Rebus.Exceptions;
+using Rebus.AzureQueues.Transport;
+using Rebus.Config;
+using Rebus.Logging;
 
 namespace Rebus.AzureQueues.Tests
 {
@@ -11,7 +13,7 @@ namespace Rebus.AzureQueues.Tests
 
         public static string ConnectionString => ConnectionStringFromFileOrNull(Path.Combine(GetBaseDirectory(), "azure_storage_connection_string.txt"))
                                          ?? ConnectionStringFromEnvironmentVariable("rebus2_storage_connection_string")
-                                         ?? Throw("Could not find Azure Storage connection string!");
+                                         ?? "UseDevelopmentStorage=true";
 
         static string GetBaseDirectory()
         {
@@ -49,9 +51,12 @@ namespace Rebus.AzureQueues.Tests
             return value;
         }
 
-        static string Throw(string message)
-        {
-            throw new RebusConfigurationException(message);
-        }
+        public static void PurgeQueue(string queueName) => new AzureStorageQueuesTransport(
+                StorageAccount,
+                queueName,
+                new NullLoggerFactory(),
+                new AzureStorageQueuesTransportOptions()
+            )
+            .PurgeInputQueue();
     }
 }

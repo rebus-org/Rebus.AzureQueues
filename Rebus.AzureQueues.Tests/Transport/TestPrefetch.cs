@@ -23,7 +23,7 @@ namespace Rebus.AzureQueues.Tests.Transport
 
         protected override void SetUp()
         {
-            AzureStorageFactoryBase.PurgeQueue(QueueName);
+            AzureConfig.PurgeQueue(QueueName);
         }
 
         [TestCase(true, 200, 4, 30)]
@@ -51,7 +51,7 @@ namespace Rebus.AzureQueues.Tests.Transport
                         Prefetch = prefetch ? 32 : default(int?)
                     };
 
-                    t.UseAzureStorageQueues(AzureStorageFactoryBase.ConnectionString, QueueName, options);
+                    t.UseAzureStorageQueues(AzureConfig.ConnectionString, QueueName, options);
                 })
                 .Options(o =>
                 {

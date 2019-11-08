@@ -25,10 +25,10 @@ namespace Rebus.AzureQueues.Tests
 
         protected override void SetUp()
         {
-            _storageAccount = CloudStorageAccount.Parse(AzureStorageFactoryBase.ConnectionString);
+            _storageAccount = CloudStorageAccount.Parse(AzureConfig.ConnectionString);
 
-            AzureStorageFactoryBase.PurgeQueue(QueueName);
-            AzureStorageFactoryBase.PurgeQueue(TimeoutManagerQueueName);
+            AzureConfig.PurgeQueue(QueueName);
+            AzureConfig.PurgeQueue(TimeoutManagerQueueName);
 
             _activator = new BuiltinHandlerActivator();
 
