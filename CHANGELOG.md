@@ -9,4 +9,7 @@
 ## 0.4.0
 * Make it possible to take over queue creation by providing a queue factory - thanks [asleire]
 
+## 0.5.0
+* Update Microsoft.Azure.Storage.Queue dependency to 11.1.1 (which is a breaking change...) - thanks [asleire]
+
 [asleire]: https://github.com/asleire
