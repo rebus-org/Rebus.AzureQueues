@@ -1,6 +1,6 @@
 ﻿using System;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Queue;
+using Microsoft.Azure.Storage;
+using Microsoft.Azure.Storage.Queue;
 using Rebus.AzureQueues;
 using Rebus.AzureQueues.Transport;
 using Rebus.Logging;
