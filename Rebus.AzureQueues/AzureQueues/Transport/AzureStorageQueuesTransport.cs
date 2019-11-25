@@ -90,6 +90,11 @@ namespace Rebus.AzureQueues.Transport
         /// </summary>
         public void CreateQueue(string address)
         {
+            if (_options.DoNotCreateQueuesEnabled)
+            {
+                _log.Info("Transport configured to not create queue - skipping existence check and potential creation for {queueName}", address);
+                return;
+            }
             AsyncHelpers.RunSync(async () =>
             {
                 var queue = await _queueFactory.GetQueue(address);
