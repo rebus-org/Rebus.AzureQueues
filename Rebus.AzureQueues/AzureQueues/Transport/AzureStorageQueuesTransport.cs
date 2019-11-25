@@ -70,7 +70,7 @@ namespace Rebus.AzureQueues.Transport
         {
             if (rebusLoggerFactory == null) throw new ArgumentNullException(nameof(rebusLoggerFactory));
 
-            _options = options;
+            _options = options ?? throw new ArgumentNullException(nameof(options));
             _log = rebusLoggerFactory.GetLogger<AzureStorageQueuesTransport>();
             _initialVisibilityDelay = options.InitialVisibilityDelay;
             _queueFactory = queueFactory ?? throw new ArgumentNullException(nameof(queueFactory));
@@ -90,11 +90,12 @@ namespace Rebus.AzureQueues.Transport
         /// </summary>
         public void CreateQueue(string address)
         {
-            if (_options.DoNotCreateQueuesEnabled)
+            if (!_options.AutomaticallyCreateQueues)
             {
                 _log.Info("Transport configured to not create queue - skipping existence check and potential creation for {queueName}", address);
                 return;
             }
+
             AsyncHelpers.RunSync(async () =>
             {
                 var queue = await _queueFactory.GetQueue(address);

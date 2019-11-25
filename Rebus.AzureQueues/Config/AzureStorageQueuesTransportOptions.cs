@@ -33,9 +33,9 @@ namespace Rebus.Config
 
         /// <summary>
         /// Configures whether the transport will skip queue checking and creation.
-        /// Defaults to <code>false</code>.
-        /// Should be set to <code>true</code> if your application is not authorized to create queues on the Azure Storage Account. 
+        /// Defaults to <code>true</code>, which means that the input queue and the error queue will be created automatically.
+        /// Should be set to <code>false</code> if your application is not authorized to create queues on the Azure Storage Account. 
         /// </summary>
-        public bool DoNotCreateQueuesEnabled { get; set; }
+        public bool AutomaticallyCreateQueues { get; set; } = true;
     }
 }
