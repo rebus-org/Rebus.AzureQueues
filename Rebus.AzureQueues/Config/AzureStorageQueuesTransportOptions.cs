@@ -30,5 +30,12 @@ namespace Rebus.Config
         /// See https://docs.microsoft.com/en-us/rest/api/storageservices/get-messages for more
         /// </remarks>
         public TimeSpan InitialVisibilityDelay { get; set; } = TimeSpan.FromMinutes(5);
+
+        /// <summary>
+        /// Configures whether the transport will skip queue checking and creation.
+        /// Defaults to <code>false</code>.
+        /// Should be set to <code>true</code> if your application is not authorized to create queues on the Azure Storage Account. 
+        /// </summary>
+        public bool DoNotCreateQueuesEnabled { get; set; }
     }
 }
