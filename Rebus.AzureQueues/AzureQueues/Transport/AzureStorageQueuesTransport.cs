@@ -37,16 +37,18 @@ namespace Rebus.AzureQueues.Transport
         readonly TimeSpan _initialVisibilityDelay;
         readonly ILog _log;
         readonly ICloudQueueFactory _queueFactory;
+        readonly IRebusTime _rebusTime;
 
         /// <summary>
         /// Constructs the transport using a <see cref="CloudStorageAccount"/>
         /// </summary>
-        public AzureStorageQueuesTransport(CloudStorageAccount storageAccount, string inputQueueName, IRebusLoggerFactory rebusLoggerFactory, AzureStorageQueuesTransportOptions options)
+        public AzureStorageQueuesTransport(CloudStorageAccount storageAccount, string inputQueueName, IRebusLoggerFactory rebusLoggerFactory, AzureStorageQueuesTransportOptions options, IRebusTime rebusTime)
         {
             if (storageAccount == null) throw new ArgumentNullException(nameof(storageAccount));
             if (rebusLoggerFactory == null) throw new ArgumentNullException(nameof(rebusLoggerFactory));
 
             _options = options;
+            _rebusTime = rebusTime;
             _log = rebusLoggerFactory.GetLogger<AzureStorageQueuesTransport>();
             _initialVisibilityDelay = options.InitialVisibilityDelay;
 
@@ -66,11 +68,12 @@ namespace Rebus.AzureQueues.Transport
         /// <summary>
         /// Constructs the transport using a <see cref="ICloudQueueFactory"/>
         /// </summary>
-        public AzureStorageQueuesTransport(ICloudQueueFactory queueFactory, string inputQueueName, IRebusLoggerFactory rebusLoggerFactory, AzureStorageQueuesTransportOptions options)
+        public AzureStorageQueuesTransport(ICloudQueueFactory queueFactory, string inputQueueName, IRebusLoggerFactory rebusLoggerFactory, AzureStorageQueuesTransportOptions options, IRebusTime rebusTime)
         {
             if (rebusLoggerFactory == null) throw new ArgumentNullException(nameof(rebusLoggerFactory));
 
             _options = options ?? throw new ArgumentNullException(nameof(options));
+            _rebusTime = rebusTime;
             _log = rebusLoggerFactory.GetLogger<AzureStorageQueuesTransport>();
             _initialVisibilityDelay = options.InitialVisibilityDelay;
             _queueFactory = queueFactory ?? throw new ArgumentNullException(nameof(queueFactory));
@@ -112,7 +115,7 @@ namespace Rebus.AzureQueues.Transport
             {
                 var messagesToSend = new ConcurrentQueue<MessageToSend>();
 
-                context.OnCommitted(() =>
+                context.OnCommitted((_) =>
                 {
                     var messagesByQueue = messagesToSend
                         .GroupBy(m => m.DestinationAddress)
@@ -232,7 +235,7 @@ namespace Rebus.AzureQueues.Transport
             var messageId = cloudQueueMessage.Id;
             var popReceipt = cloudQueueMessage.PopReceipt;
 
-            context.OnCompleted(async () =>
+            context.OnCompleted(async (_) =>
             {
                 try
                 {
@@ -251,7 +254,7 @@ namespace Rebus.AzureQueues.Transport
                 }
             });
 
-            context.OnAborted(() =>
+            context.OnAborted((_) =>
             {
                 const MessageUpdateFields fields = MessageUpdateFields.Visibility;
                 var visibilityTimeout = TimeSpan.FromSeconds(0);
@@ -296,7 +299,7 @@ namespace Rebus.AzureQueues.Transport
 
             var enqueueTime = deferredUntilDateTimeOffsetString.ToDateTimeOffset();
 
-            var difference = enqueueTime - RebusTime.Now;
+            var difference = enqueueTime - _rebusTime.Now;
             if (difference <= TimeSpan.Zero) return null;
             return difference;
         }

@@ -8,6 +8,7 @@ using Rebus.Config;
 using Rebus.Persistence.InMem;
 using Rebus.Tests.Contracts;
 using Rebus.Tests.Contracts.Extensions;
+using Rebus.Time;
 using Rebus.Timeouts;
 
 // ReSharper disable ArgumentsStyleNamedExpression
@@ -54,7 +55,7 @@ namespace Rebus.AzureQueues.Tests
 
                     t.UseAzureStorageQueues(_storageAccount, QueueName, options: options);
                 })
-                .Timeouts(t => t.Register(c => new InMemoryTimeoutManager()))
+                .Timeouts(t => t.Register(c => new InMemoryTimeoutManager(new DefaultRebusTime())))
                 .Start();
 
             await bus.DeferLocal(TimeSpan.FromSeconds(5), "hej med dig min ven!!!!!");
@@ -73,7 +74,7 @@ namespace Rebus.AzureQueues.Tests
 
                     t.UseAzureStorageQueues(_storageAccount, TimeoutManagerQueueName, options: options);
                 })
-                .Timeouts(t => t.Register(c => new InMemoryTimeoutManager()))
+                .Timeouts(t => t.Register(c => new InMemoryTimeoutManager(new DefaultRebusTime())))
                 .Start();
 
             var gotTheString = new ManualResetEvent(false);
