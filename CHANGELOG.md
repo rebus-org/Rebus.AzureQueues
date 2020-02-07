@@ -15,4 +15,7 @@
 ## 0.6.0
 * Add ability to skip queue creation - thanks [asleire]
 
+## 1.0.0
+* Update to Rebus 6 - thanks [asleire]
+
 [asleire]: https://github.com/asleire
