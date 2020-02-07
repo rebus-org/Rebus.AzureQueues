@@ -4,6 +4,7 @@ using Rebus.AzureQueues.Transport;
 using Rebus.Config;
 using Rebus.Logging;
 using Rebus.Tests.Contracts.Transports;
+using Rebus.Time;
 using Rebus.Transport;
 
 namespace Rebus.AzureQueues.Tests.Transport
@@ -21,7 +22,7 @@ namespace Rebus.AzureQueues.Tests.Transport
         {
             if (inputQueueAddress == null)
             {
-                var transport = new AzureStorageQueuesTransport(AzureConfig.StorageAccount, null, new ConsoleLoggerFactory(false), new AzureStorageQueuesTransportOptions());
+                var transport = new AzureStorageQueuesTransport(AzureConfig.StorageAccount, null, new ConsoleLoggerFactory(false), new AzureStorageQueuesTransportOptions(), new DefaultRebusTime());
 
                 transport.Initialize();
 
@@ -30,7 +31,7 @@ namespace Rebus.AzureQueues.Tests.Transport
 
             return _transports.GetOrAdd(inputQueueAddress, address =>
             {
-                var transport = new AzureStorageQueuesTransport(AzureConfig.StorageAccount, inputQueueAddress, new ConsoleLoggerFactory(false), new AzureStorageQueuesTransportOptions());
+                var transport = new AzureStorageQueuesTransport(AzureConfig.StorageAccount, inputQueueAddress, new ConsoleLoggerFactory(false), new AzureStorageQueuesTransportOptions(), new DefaultRebusTime());
 
                 transport.PurgeInputQueue();
 

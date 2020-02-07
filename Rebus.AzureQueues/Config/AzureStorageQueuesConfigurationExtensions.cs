@@ -6,6 +6,7 @@ using Rebus.AzureQueues.Transport;
 using Rebus.Logging;
 using Rebus.Pipeline;
 using Rebus.Pipeline.Receive;
+using Rebus.Time;
 using Rebus.Timeouts;
 using Rebus.Transport;
 // ReSharper disable ArgumentsStyleNamedExpression
@@ -108,7 +109,8 @@ Configure.With(...)
             configurer.Register(c =>
             {
                 var rebusLoggerFactory = c.Get<IRebusLoggerFactory>();
-                return new AzureStorageQueuesTransport(queueFactory, inputQueueAddress, rebusLoggerFactory, options);
+                var rebusTime = c.Get<IRebusTime>();
+                return new AzureStorageQueuesTransport(queueFactory, inputQueueAddress, rebusLoggerFactory, options, rebusTime);
             });
 
             if (options.UseNativeDeferredMessages)
