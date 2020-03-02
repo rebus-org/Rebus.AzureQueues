@@ -19,6 +19,7 @@ using Rebus.Time;
 using Rebus.Transport;
 // ReSharper disable MethodSupportsCancellation
 // ReSharper disable EmptyGeneralCatchClause
+// ReSharper disable UnusedMember.Global
 #pragma warning disable 1998
 
 namespace Rebus.AzureQueues.Transport
@@ -32,7 +33,6 @@ namespace Rebus.AzureQueues.Transport
         static readonly QueueRequestOptions ExponentialRetryRequestOptions = new QueueRequestOptions { RetryPolicy = new ExponentialRetry() };
         static readonly QueueRequestOptions DefaultQueueRequestOptions = new QueueRequestOptions();
         readonly AzureStorageQueuesTransportOptions _options;
-        readonly ConcurrentDictionary<string, CloudQueue> _queues = new ConcurrentDictionary<string, CloudQueue>();
         readonly ConcurrentQueue<CloudQueueMessage> _prefetchedMessages = new ConcurrentQueue<CloudQueueMessage>();
         readonly TimeSpan _initialVisibilityDelay;
         readonly ILog _log;
@@ -64,7 +64,7 @@ namespace Rebus.AzureQueues.Transport
                 Address = inputQueueName.ToLowerInvariant();
             }
         }
-        
+
         /// <summary>
         /// Constructs the transport using a <see cref="ICloudQueueFactory"/>
         /// </summary>
@@ -115,7 +115,7 @@ namespace Rebus.AzureQueues.Transport
             {
                 var messagesToSend = new ConcurrentQueue<MessageToSend>();
 
-                context.OnCommitted((_) =>
+                context.OnCommitted(ctx =>
                 {
                     var messagesByQueue = messagesToSend
                         .GroupBy(m => m.DestinationAddress)
@@ -182,10 +182,40 @@ namespace Rebus.AzureQueues.Transport
         {
             if (Address == null)
             {
-                throw new InvalidOperationException("This Azure Storage Queues transport does not have an input queue, hence it is not possible to receive anything");
+                throw new InvalidOperationException("This Azure Storage Queues transport does not have an input queue, which means that it is configured to be a one-way client. Therefore, it is not possible to receive anything.");
             }
 
             var inputQueue = await _queueFactory.GetQueue(Address);
+
+            try
+            {
+                return await InnerReceive(context, cancellationToken, inputQueue);
+            }
+            catch (StorageException exception) when (exception.InnerException is OperationCanceledException && cancellationToken.IsCancellationRequested)
+            {
+                // it's OK, we're exiting... TaskCancelledException wrapped in StorageException is just how the driver rolls
+                return null;
+            }
+        }
+
+        async Task<TransportMessage> InnerReceive(ITransactionContext context, CancellationToken cancellationToken, CloudQueue inputQueue)
+        {
+            if (!_options.Prefetch.HasValue)
+            {
+                // fetch single message
+                var cloudQueueMessage = await inputQueue.GetMessageAsync(
+                    _initialVisibilityDelay,
+                    DefaultQueueRequestOptions,
+                    new OperationContext(),
+                    cancellationToken
+                );
+
+                if (cloudQueueMessage == null) return null;
+
+                SetUpCompletion(context, cloudQueueMessage, inputQueue);
+
+                return Deserialize(cloudQueueMessage);
+            }
 
             if (_prefetchedMessages.TryDequeue(out var dequeuedMessage))
             {
@@ -193,41 +223,26 @@ namespace Rebus.AzureQueues.Transport
                 return Deserialize(dequeuedMessage);
             }
 
-            if (_options.Prefetch.HasValue)
-            {
-                var cloudQueueMessages = await inputQueue.GetMessagesAsync(
-                    _options.Prefetch.Value,
-                    _initialVisibilityDelay,
-                    DefaultQueueRequestOptions,
-                    new OperationContext(),
-                    cancellationToken
-                );
-
-                foreach (var message in cloudQueueMessages)
-                {
-                    _prefetchedMessages.Enqueue(message);
-                }
-
-                if (_prefetchedMessages.TryDequeue(out var newlyPrefetchedMessage))
-                {
-                    SetUpCompletion(context, newlyPrefetchedMessage, inputQueue);
-                    return Deserialize(newlyPrefetchedMessage);
-                }
-
-                return null;
-            }
-
-            var cloudQueueMessage = await inputQueue.GetMessageAsync(
+            var cloudQueueMessages = await inputQueue.GetMessagesAsync(
+                _options.Prefetch.Value,
                 _initialVisibilityDelay,
                 DefaultQueueRequestOptions,
                 new OperationContext(),
                 cancellationToken
             );
 
-            if (cloudQueueMessage == null) return null;
+            foreach (var message in cloudQueueMessages)
+            {
+                _prefetchedMessages.Enqueue(message);
+            }
 
-            SetUpCompletion(context, cloudQueueMessage, inputQueue);
-            return Deserialize(cloudQueueMessage);
+            if (_prefetchedMessages.TryDequeue(out var newlyPrefetchedMessage))
+            {
+                SetUpCompletion(context, newlyPrefetchedMessage, inputQueue);
+                return Deserialize(newlyPrefetchedMessage);
+            }
+
+            return null;
         }
 
         static void SetUpCompletion(ITransactionContext context, CloudQueueMessage cloudQueueMessage, CloudQueue inputQueue)
@@ -235,7 +250,7 @@ namespace Rebus.AzureQueues.Transport
             var messageId = cloudQueueMessage.Id;
             var popReceipt = cloudQueueMessage.PopReceipt;
 
-            context.OnCompleted(async (_) =>
+            context.OnCompleted(async ctx =>
             {
                 try
                 {
@@ -254,7 +269,7 @@ namespace Rebus.AzureQueues.Transport
                 }
             });
 
-            context.OnAborted((_) =>
+            context.OnAborted(ctx =>
             {
                 const MessageUpdateFields fields = MessageUpdateFields.Visibility;
                 var visibilityTimeout = TimeSpan.FromSeconds(0);
@@ -271,16 +286,21 @@ namespace Rebus.AzureQueues.Transport
             });
         }
 
-        static TimeSpan? GetTimeToBeReceivedOrNull(Dictionary<string, string> headers)
+        static TimeSpan? GetTimeToBeReceivedOrNull(IReadOnlyDictionary<string, string> headers)
         {
             if (!headers.TryGetValue(Headers.TimeToBeReceived, out var timeToBeReceivedStr))
             {
                 return null;
             }
 
-            TimeSpan? timeToBeReceived = TimeSpan.Parse(timeToBeReceivedStr);
-
-            return timeToBeReceived;
+            try
+            {
+                return TimeSpan.Parse(timeToBeReceivedStr);
+            }
+            catch (Exception exception)
+            {
+                throw new FormatException($"Could not parse the string '{timeToBeReceivedStr}' into a TimeSpan!", exception);
+            }
         }
 
         TimeSpan? GetQueueVisibilityDelayOrNull(Dictionary<string, string> headers)
@@ -345,11 +365,10 @@ namespace Rebus.AzureQueues.Transport
 
             _log.Info("Initializing one-way Azure Storage Queues transport");
         }
-        
+
         /// <summary>
-        /// Purges the input queue (WARNING: potentially very slow operation, as it will continue to batch receive messages until the queue is empty
+        /// Purges the input queue
         /// </summary>
-        /// <exception cref="RebusApplicationException"></exception>
         public void PurgeInputQueue()
         {
             AsyncHelpers.RunSync(async () =>
