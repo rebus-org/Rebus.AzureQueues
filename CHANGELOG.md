@@ -18,4 +18,8 @@
 ## 1.0.0
 * Update to Rebus 6 - thanks [asleire]
 
+## 1.1.0
+* Update Microsoft.Azure.Storage.Queue dependency to 11.2.2
+* Remove unnecessary explicit dependencies on Microsoft.Azure.Storage.Common and Microsoft.Azure.KeyVault.Core
+
 [asleire]: https://github.com/asleire

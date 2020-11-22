@@ -40,9 +40,7 @@
     <DocumentationFile>bin\Release\Rebus.AzureQueues.xml</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.Azure.KeyVault.Core" Version="3.0.3" />
-    <PackageReference Include="microsoft.azure.storage.common" Version="11.1.1" />
-    <PackageReference Include="microsoft.azure.storage.queue" Version="11.1.1" />
+    <PackageReference Include="microsoft.azure.storage.queue" Version="11.2.2" />
     <PackageReference Include="rebus" Version="6.0.0" />
   </ItemGroup>
   <ItemGroup>
