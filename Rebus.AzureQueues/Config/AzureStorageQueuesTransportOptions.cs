@@ -37,5 +37,14 @@ namespace Rebus.Config
         /// Should be set to <code>false</code> if your application is not authorized to create queues on the Azure Storage Account. 
         /// </summary>
         public bool AutomaticallyCreateQueues { get; set; } = true;
+
+        /// <summary>
+        /// Enables automatic peek lock renewal. Only enable this if you intend on handling messages for a long long time, and
+        /// DON'T intend on handling messages quickly - it will have an impact on message receive, so only enable it if you
+        /// need it. You should usually strive after keeping message processing times low, much lower than the 5 minute lease
+        /// you get with Azure Queue. Will not work with prefecth of messages.
+        /// </summary>
+        public bool AutomaticPeekLockRenewalEnabled { get; set; } = false;
+
     }
 }

@@ -9,12 +9,14 @@ using Microsoft.Azure.Storage;
 using Microsoft.Azure.Storage.Queue;
 using Microsoft.Azure.Storage.RetryPolicies;
 using Newtonsoft.Json;
+using Rebus.AzureQueues.Internals;
 using Rebus.Bus;
 using Rebus.Config;
 using Rebus.Exceptions;
 using Rebus.Extensions;
 using Rebus.Logging;
 using Rebus.Messages;
+using Rebus.Threading;
 using Rebus.Time;
 using Rebus.Transport;
 // ReSharper disable MethodSupportsCancellation
@@ -27,48 +29,35 @@ namespace Rebus.AzureQueues.Transport
     /// <summary>
     /// Implementation of <see cref="ITransport"/> that uses Azure Storage Queues to do its thing
     /// </summary>
-    public class AzureStorageQueuesTransport : ITransport, IInitializable
+    public class AzureStorageQueuesTransport : ITransport, IInitializable, IDisposable
     {
         const string QueueNameValidationRegex = "^[a-z0-9](?!.*--)[a-z0-9-]{1,61}[a-z0-9]$";
         static readonly QueueRequestOptions ExponentialRetryRequestOptions = new QueueRequestOptions { RetryPolicy = new ExponentialRetry() };
         static readonly QueueRequestOptions DefaultQueueRequestOptions = new QueueRequestOptions();
+        readonly ConcurrentDictionary<string, MessageLockRenewer> _messageLockRenewers = new ConcurrentDictionary<string, MessageLockRenewer>();
         readonly AzureStorageQueuesTransportOptions _options;
         readonly ConcurrentQueue<CloudQueueMessage> _prefetchedMessages = new ConcurrentQueue<CloudQueueMessage>();
+        readonly IAsyncTask _messageLockRenewalTask;
         readonly TimeSpan _initialVisibilityDelay;
         readonly ILog _log;
         readonly ICloudQueueFactory _queueFactory;
         readonly IRebusTime _rebusTime;
 
+
         /// <summary>
         /// Constructs the transport using a <see cref="CloudStorageAccount"/>
         /// </summary>
-        public AzureStorageQueuesTransport(CloudStorageAccount storageAccount, string inputQueueName, IRebusLoggerFactory rebusLoggerFactory, AzureStorageQueuesTransportOptions options, IRebusTime rebusTime)
+        public AzureStorageQueuesTransport(CloudStorageAccount storageAccount, string inputQueueName, IRebusLoggerFactory rebusLoggerFactory, AzureStorageQueuesTransportOptions options, IRebusTime rebusTime, IAsyncTaskFactory asyncTaskFactory)
+            : this(new CloudQueueClientQueueFactory(storageAccount.CreateCloudQueueClient()), inputQueueName, rebusLoggerFactory, options, rebusTime, asyncTaskFactory)
         {
             if (storageAccount == null) throw new ArgumentNullException(nameof(storageAccount));
-            if (rebusLoggerFactory == null) throw new ArgumentNullException(nameof(rebusLoggerFactory));
 
-            _options = options;
-            _rebusTime = rebusTime;
-            _log = rebusLoggerFactory.GetLogger<AzureStorageQueuesTransport>();
-            _initialVisibilityDelay = options.InitialVisibilityDelay;
-
-            var queueClient = storageAccount.CreateCloudQueueClient();
-            _queueFactory = new CloudQueueClientQueueFactory(queueClient);
-
-            if (inputQueueName != null)
-            {
-                if (!Regex.IsMatch(inputQueueName, QueueNameValidationRegex))
-                {
-                    throw new ArgumentException($"The inputQueueName {inputQueueName} is not valid - it can contain only alphanumeric characters and hyphens, and must not have 2 consecutive hyphens.", nameof(inputQueueName));
-                }
-                Address = inputQueueName.ToLowerInvariant();
-            }
         }
 
         /// <summary>
         /// Constructs the transport using a <see cref="ICloudQueueFactory"/>
         /// </summary>
-        public AzureStorageQueuesTransport(ICloudQueueFactory queueFactory, string inputQueueName, IRebusLoggerFactory rebusLoggerFactory, AzureStorageQueuesTransportOptions options, IRebusTime rebusTime)
+        public AzureStorageQueuesTransport(ICloudQueueFactory queueFactory, string inputQueueName, IRebusLoggerFactory rebusLoggerFactory, AzureStorageQueuesTransportOptions options, IRebusTime rebusTime, IAsyncTaskFactory asyncTaskFactory)
         {
             if (rebusLoggerFactory == null) throw new ArgumentNullException(nameof(rebusLoggerFactory));
 
@@ -86,6 +75,7 @@ namespace Rebus.AzureQueues.Transport
                 }
                 Address = inputQueueName.ToLowerInvariant();
             }
+            _messageLockRenewalTask = asyncTaskFactory.Create("Peek Lock Renewal", RenewPeekLocks, prettyInsignificant: true, intervalSeconds: 10);
         }
 
         /// <summary>
@@ -212,6 +202,11 @@ namespace Rebus.AzureQueues.Transport
 
                 if (cloudQueueMessage == null) return null;
 
+                if (_options.AutomaticPeekLockRenewalEnabled)
+                {
+                    _messageLockRenewers.TryAdd(cloudQueueMessage.Id, new MessageLockRenewer(cloudQueueMessage, inputQueue));
+                }
+
                 SetUpCompletion(context, cloudQueueMessage, inputQueue);
 
                 return Deserialize(cloudQueueMessage);
@@ -245,10 +240,11 @@ namespace Rebus.AzureQueues.Transport
             return null;
         }
 
-        static void SetUpCompletion(ITransactionContext context, CloudQueueMessage cloudQueueMessage, CloudQueue inputQueue)
+        void SetUpCompletion(ITransactionContext context, CloudQueueMessage cloudQueueMessage, CloudQueue inputQueue)
         {
             var messageId = cloudQueueMessage.Id;
             var popReceipt = cloudQueueMessage.PopReceipt;
+
 
             context.OnCompleted(async ctx =>
             {
@@ -273,7 +269,7 @@ namespace Rebus.AzureQueues.Transport
             {
                 const MessageUpdateFields fields = MessageUpdateFields.Visibility;
                 var visibilityTimeout = TimeSpan.FromSeconds(0);
-
+                _messageLockRenewers.TryRemove(messageId, out _);
                 AsyncHelpers.RunSync(async () =>
                 {
                     // ignore if this fails
@@ -284,6 +280,8 @@ namespace Rebus.AzureQueues.Transport
                     catch { }
                 });
             });
+
+            context.OnDisposed(ctx => _messageLockRenewers.TryRemove(messageId, out _));
         }
 
         static TimeSpan? GetTimeToBeReceivedOrNull(IReadOnlyDictionary<string, string> headers)
@@ -360,9 +358,12 @@ namespace Rebus.AzureQueues.Transport
             {
                 _log.Info("Initializing Azure Storage Queues transport with queue '{0}'", Address);
                 CreateQueue(Address);
+                if (_options.AutomaticPeekLockRenewalEnabled)
+                {
+                    _messageLockRenewalTask.Start();
+                }
                 return;
             }
-
             _log.Info("Initializing one-way Azure Storage Queues transport");
         }
 
@@ -388,6 +389,41 @@ namespace Rebus.AzureQueues.Transport
                     throw new RebusApplicationException(exception, "Could not purge queue");
                 }
             });
+        }
+
+        async Task RenewPeekLocks()
+        {
+            var mustBeRenewed = _messageLockRenewers.Values
+                .Where(r => r.IsDue)
+                .ToList();
+
+            if (!mustBeRenewed.Any()) return;
+
+            _log.Debug("Found {count} peek locks to be renewed", mustBeRenewed.Count);
+
+            await Task.WhenAll(mustBeRenewed.Select(async r =>
+            {
+                try
+                {
+                    await r.Renew().ConfigureAwait(false);
+
+                    _log.Debug("Successfully renewed peek lock for message with ID {messageId}", r.MessageId);
+                }
+                catch (Exception exception)
+                {
+                    _log.Warn(exception, "Error when renewing peek lock for message with ID {messageId}", r.MessageId);
+                }
+            }));
+        }
+
+
+        /// <summary>
+        /// Disposes background running tasks
+        /// </summary>
+        public void Dispose()
+        {
+            _messageLockRenewalTask?.Dispose();
+
         }
     }
 }

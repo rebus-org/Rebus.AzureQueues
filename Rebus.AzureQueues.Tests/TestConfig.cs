@@ -4,6 +4,7 @@ using Microsoft.Azure.Storage;
 using Rebus.AzureQueues.Transport;
 using Rebus.Config;
 using Rebus.Logging;
+using Rebus.Threading.SystemThreadingTimer;
 using Rebus.Time;
 
 namespace Rebus.AzureQueues.Tests
@@ -57,7 +58,8 @@ namespace Rebus.AzureQueues.Tests
                 queueName,
                 new NullLoggerFactory(),
                 new AzureStorageQueuesTransportOptions(),
-                new DefaultRebusTime()
+                new DefaultRebusTime(),
+                 new SystemThreadingTimerAsyncTaskFactory(new NullLoggerFactory())
             )
             .PurgeInputQueue();
     }
