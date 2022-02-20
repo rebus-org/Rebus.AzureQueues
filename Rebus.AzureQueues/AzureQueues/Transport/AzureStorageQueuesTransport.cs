@@ -263,6 +263,7 @@ namespace Rebus.AzureQueues.Transport
                 {
                     throw new RebusApplicationException(exception, $"Could not delete message with ID {messageId} and pop receipt {popReceipt} from the input queue");
                 }
+                _messageLockRenewers.TryRemove(messageId, out _);
             });
 
             context.OnAborted(ctx =>
