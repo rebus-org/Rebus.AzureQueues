@@ -13,95 +13,94 @@ using Rebus.Timeouts;
 
 // ReSharper disable ArgumentsStyleNamedExpression
 
-namespace Rebus.AzureQueues.Tests
+namespace Rebus.AzureQueues.Tests;
+
+[TestFixture]
+public class AlternativeTimeoutManager : FixtureBase
 {
-    [TestFixture]
-    public class AlternativeTimeoutManager : FixtureBase
+    static readonly string QueueName = TestConfig.GetName("input");
+    static readonly string TimeoutManagerQueueName = TestConfig.GetName("timeouts");
+
+    BuiltinHandlerActivator _activator;
+    CloudStorageAccount _storageAccount;
+
+    protected override void SetUp()
     {
-        static readonly string QueueName = TestConfig.GetName("input");
-        static readonly string TimeoutManagerQueueName = TestConfig.GetName("timeouts");
+        _storageAccount = CloudStorageAccount.Parse(AzureConfig.ConnectionString);
 
-        BuiltinHandlerActivator _activator;
-        CloudStorageAccount _storageAccount;
+        AzureConfig.PurgeQueue(QueueName);
+        AzureConfig.PurgeQueue(TimeoutManagerQueueName);
 
-        protected override void SetUp()
+        _activator = new BuiltinHandlerActivator();
+
+        Using(_activator);
+    }
+
+    [Test]
+    public async Task CanUseAlternativeTimeoutManager()
+    {
+        var gotTheString = new ManualResetEvent(false);
+
+        _activator.Handle<string>(async str =>
         {
-            _storageAccount = CloudStorageAccount.Parse(AzureConfig.ConnectionString);
+            Console.WriteLine($"Received string: '{str}'");
 
-            AzureConfig.PurgeQueue(QueueName);
-            AzureConfig.PurgeQueue(TimeoutManagerQueueName);
+            gotTheString.Set();
+        });
 
-            _activator = new BuiltinHandlerActivator();
-
-            Using(_activator);
-        }
-
-        [Test]
-        public async Task CanUseAlternativeTimeoutManager()
-        {
-            var gotTheString = new ManualResetEvent(false);
-
-            _activator.Handle<string>(async str =>
+        var bus = Configure.With(_activator)
+            .Transport(t =>
             {
-                Console.WriteLine($"Received string: '{str}'");
+                var options = new AzureStorageQueuesTransportOptions { UseNativeDeferredMessages = false };
 
-                gotTheString.Set();
-            });
+                t.UseAzureStorageQueues(_storageAccount, QueueName, options: options);
+            })
+            .Timeouts(t => t.Register(c => new InMemoryTimeoutManager(new DefaultRebusTime())))
+            .Start();
 
-            var bus = Configure.With(_activator)
-                .Transport(t =>
-                {
-                    var options = new AzureStorageQueuesTransportOptions { UseNativeDeferredMessages = false };
+        await bus.DeferLocal(TimeSpan.FromSeconds(5), "hej med dig min ven!!!!!");
 
-                    t.UseAzureStorageQueues(_storageAccount, QueueName, options: options);
-                })
-                .Timeouts(t => t.Register(c => new InMemoryTimeoutManager(new DefaultRebusTime())))
-                .Start();
+        gotTheString.WaitOrDie(TimeSpan.FromSeconds(10), "Did not receive the string withing 10 s timeout");
+    }
 
-            await bus.DeferLocal(TimeSpan.FromSeconds(5), "hej med dig min ven!!!!!");
-
-            gotTheString.WaitOrDie(TimeSpan.FromSeconds(10), "Did not receive the string withing 10 s timeout");
-        }
-
-        [Test]
-        public async Task CanUseDedicatedAlternativeTimeoutManager()
-        {
-            // start the timeout manager
-            Configure.With(Using(new BuiltinHandlerActivator()))
-                .Transport(t =>
-                {
-                    var options = new AzureStorageQueuesTransportOptions { UseNativeDeferredMessages = false };
-
-                    t.UseAzureStorageQueues(_storageAccount, TimeoutManagerQueueName, options: options);
-                })
-                .Timeouts(t => t.Register(c => new InMemoryTimeoutManager(new DefaultRebusTime())))
-                .Start();
-
-            var gotTheString = new ManualResetEvent(false);
-
-            _activator.Handle<string>(async str =>
+    [Test]
+    public async Task CanUseDedicatedAlternativeTimeoutManager()
+    {
+        // start the timeout manager
+        Configure.With(Using(new BuiltinHandlerActivator()))
+            .Transport(t =>
             {
-                Console.WriteLine($"Received string: '{str}'");
+                var options = new AzureStorageQueuesTransportOptions { UseNativeDeferredMessages = false };
 
-                gotTheString.Set();
-            });
+                t.UseAzureStorageQueues(_storageAccount, TimeoutManagerQueueName, options: options);
+            })
+            .Timeouts(t => t.Register(c => new InMemoryTimeoutManager(new DefaultRebusTime())))
+            .Start();
 
-            var bus = Configure.With(_activator)
-                .Transport(t =>
-                {
-                    var options = new AzureStorageQueuesTransportOptions { UseNativeDeferredMessages = false };
+        var gotTheString = new ManualResetEvent(false);
 
-                    t.UseAzureStorageQueues(_storageAccount, QueueName, options: options);
-                })
-                .Timeouts(t => t.UseExternalTimeoutManager(TimeoutManagerQueueName))
-                .Start();
+        _activator.Handle<string>(async str =>
+        {
+            Console.WriteLine($"Received string: '{str}'");
 
-            await bus.DeferLocal(TimeSpan.FromSeconds(5), "hej med dig min ven!!!!!");
+            gotTheString.Set();
+        });
 
-            gotTheString.WaitOrDie(TimeSpan.FromSeconds(10), "Did not receive the string withing 10 s timeout");
+        var bus = Configure.With(_activator)
+            .Transport(t =>
+            {
+                var options = new AzureStorageQueuesTransportOptions { UseNativeDeferredMessages = false };
 
-            //// don't dispose too quickly, or else we'll get annoying errors in the log
-            //await Task.Delay(TimeSpan.FromSeconds(0.5));
-        }
+                t.UseAzureStorageQueues(_storageAccount, QueueName, options: options);
+            })
+            .Timeouts(t => t.UseExternalTimeoutManager(TimeoutManagerQueueName))
+            .Start();
+
+        await bus.DeferLocal(TimeSpan.FromSeconds(5), "hej med dig min ven!!!!!");
+
+        gotTheString.WaitOrDie(TimeSpan.FromSeconds(10), "Did not receive the string withing 10 s timeout");
+
+        //// don't dispose too quickly, or else we'll get annoying errors in the log
+        //await Task.Delay(TimeSpan.FromSeconds(0.5));
     }
 }

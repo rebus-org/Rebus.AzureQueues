@@ -22,4 +22,9 @@
 * Update Microsoft.Azure.Storage.Queue dependency to 11.2.2
 * Remove unnecessary explicit dependencies on Microsoft.Azure.Storage.Common and Microsoft.Azure.KeyVault.Core
 
+## 2.0.0
+* Only target .NET Standard 2.0
+* Add ability to automatically renew peek locks - thanks [hdrachmann]
+
 [asleire]: https://github.com/asleire
+[hdrachmann]: https://github.com/hdrachmann

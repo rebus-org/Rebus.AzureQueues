@@ -1,32 +1,23 @@
 ﻿using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
-using Microsoft.Azure.Storage;
 using Microsoft.Azure.Storage.Queue;
+#pragma warning disable CS1998
 
-namespace Rebus.AzureQueues
+namespace Rebus.AzureQueues;
+
+internal class CloudQueueClientQueueFactory : ICloudQueueFactory
 {
-    internal class CloudQueueClientQueueFactory : ICloudQueueFactory
+    readonly ConcurrentDictionary<string, Task<CloudQueue>> _queues = new();
+    readonly CloudQueueClient _cloudQueueClient;
+
+    public CloudQueueClientQueueFactory(CloudQueueClient cloudQueueClient)
     {
-        private readonly ConcurrentDictionary<string, Task<CloudQueue>> _queues = new ConcurrentDictionary<string, Task<CloudQueue>>();
-        private readonly CloudQueueClient _cloudQueueClient;
+        _cloudQueueClient = cloudQueueClient ?? throw new ArgumentNullException(nameof(cloudQueueClient));
+    }
 
-        public CloudQueueClientQueueFactory(CloudQueueClient cloudQueueClient)
-        {
-            _cloudQueueClient = cloudQueueClient;
-        }
-
-        private Task<CloudQueue> InternalQueueFactory(string queueName)
-        {
-            return Task.FromResult(_cloudQueueClient.GetQueueReference(queueName));
-        }
-
-        public Task<CloudQueue> GetQueue(string queueName)
-        {
-            return _queues.GetOrAdd(queueName, InternalQueueFactory);
-        }
+    public Task<CloudQueue> GetQueue(string queueName)
+    {
+        return _queues.GetOrAdd(queueName, async _ => _cloudQueueClient.GetQueueReference(queueName));
     }
 }

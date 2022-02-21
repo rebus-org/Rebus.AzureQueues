@@ -117,7 +117,7 @@ Configure.With(...)
 
             if (options.UseNativeDeferredMessages)
             {
-                configurer.OtherService<ITimeoutManager>().Register(c => new DisabledTimeoutManager(), description: AsqTimeoutManagerText);
+                configurer.OtherService<ITimeoutManager>().Register(_ => new DisabledTimeoutManager(), description: AsqTimeoutManagerText);
 
                 configurer.OtherService<IPipeline>().Decorate(c =>
                 {

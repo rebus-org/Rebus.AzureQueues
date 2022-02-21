@@ -8,42 +8,41 @@ using Rebus.Threading.SystemThreadingTimer;
 using Rebus.Time;
 using Rebus.Transport;
 
-namespace Rebus.AzureQueues.Tests.Transport
+namespace Rebus.AzureQueues.Tests.Transport;
+
+public class AzureStorageQueuesTransportFactory : ITransportFactory
 {
-    public class AzureStorageQueuesTransportFactory : ITransportFactory
+    readonly ConcurrentDictionary<string, AzureStorageQueuesTransport> _transports = new ConcurrentDictionary<string, AzureStorageQueuesTransport>(StringComparer.OrdinalIgnoreCase);
+
+    public ITransport CreateOneWayClient()
     {
-        readonly ConcurrentDictionary<string, AzureStorageQueuesTransport> _transports = new ConcurrentDictionary<string, AzureStorageQueuesTransport>(StringComparer.OrdinalIgnoreCase);
+        return Create(null);
+    }
 
-        public ITransport CreateOneWayClient()
+    public ITransport Create(string inputQueueAddress)
+    {
+        if (inputQueueAddress == null)
         {
-            return Create(null);
+            var transport = new AzureStorageQueuesTransport(AzureConfig.StorageAccount, null, new ConsoleLoggerFactory(false), new AzureStorageQueuesTransportOptions(), new DefaultRebusTime(),new SystemThreadingTimerAsyncTaskFactory(new ConsoleLoggerFactory(false)));
+
+            transport.Initialize();
+
+            return transport;
         }
 
-        public ITransport Create(string inputQueueAddress)
+        return _transports.GetOrAdd(inputQueueAddress, address =>
         {
-            if (inputQueueAddress == null)
-            {
-                var transport = new AzureStorageQueuesTransport(AzureConfig.StorageAccount, null, new ConsoleLoggerFactory(false), new AzureStorageQueuesTransportOptions(), new DefaultRebusTime(),new SystemThreadingTimerAsyncTaskFactory(new ConsoleLoggerFactory(false)));
+            var transport = new AzureStorageQueuesTransport(AzureConfig.StorageAccount, inputQueueAddress, new ConsoleLoggerFactory(false), new AzureStorageQueuesTransportOptions(), new DefaultRebusTime(), new SystemThreadingTimerAsyncTaskFactory(new ConsoleLoggerFactory(false)));
 
-                transport.Initialize();
+            transport.PurgeInputQueue();
 
-                return transport;
-            }
+            transport.Initialize();
 
-            return _transports.GetOrAdd(inputQueueAddress, address =>
-            {
-                var transport = new AzureStorageQueuesTransport(AzureConfig.StorageAccount, inputQueueAddress, new ConsoleLoggerFactory(false), new AzureStorageQueuesTransportOptions(), new DefaultRebusTime(), new SystemThreadingTimerAsyncTaskFactory(new ConsoleLoggerFactory(false)));
+            return transport;
+        });
+    }
 
-                transport.PurgeInputQueue();
-
-                transport.Initialize();
-
-                return transport;
-            });
-        }
-
-        public void CleanUp()
-        {
-        }
+    public void CleanUp()
+    {
     }
 }
