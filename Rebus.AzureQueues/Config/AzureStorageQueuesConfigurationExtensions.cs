@@ -6,6 +6,7 @@ using Rebus.AzureQueues.Transport;
 using Rebus.Logging;
 using Rebus.Pipeline;
 using Rebus.Pipeline.Receive;
+using Rebus.Threading;
 using Rebus.Time;
 using Rebus.Timeouts;
 using Rebus.Transport;
@@ -108,9 +109,10 @@ Configure.With(...)
 
             configurer.Register(c =>
             {
+                var asyncTaskFactory = c.Get<IAsyncTaskFactory>();
                 var rebusLoggerFactory = c.Get<IRebusLoggerFactory>();
                 var rebusTime = c.Get<IRebusTime>();
-                return new AzureStorageQueuesTransport(queueFactory, inputQueueAddress, rebusLoggerFactory, options, rebusTime);
+                return new AzureStorageQueuesTransport(queueFactory, inputQueueAddress, rebusLoggerFactory, options, rebusTime, asyncTaskFactory);
             });
 
             if (options.UseNativeDeferredMessages)
