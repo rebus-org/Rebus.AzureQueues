@@ -14,7 +14,7 @@
 		<PackageIcon>little_rebusbus2_copy-500x500.png</PackageIcon>
 	</PropertyGroup>
 	<ItemGroup>
-		<PackageReference Include="microsoft.azure.storage.queue" Version="11.2.2" />
+		<PackageReference Include="microsoft.azure.storage.queue" Version="11.2.3" />
 		<PackageReference Include="rebus" Version="6.0.0" />
 	</ItemGroup>
 	<ItemGroup>

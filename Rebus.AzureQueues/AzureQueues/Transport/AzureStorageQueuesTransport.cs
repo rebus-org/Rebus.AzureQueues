@@ -119,18 +119,18 @@ public class AzureStorageQueuesTransport : ITransport, IInitializable, IDisposab
                     await Task.WhenAll(batch.Select(async message =>
                     {
                         var headers = message.Headers.Clone();
-                        var timeToBeReceivedOrNull = GetTimeToBeReceivedOrNull(headers);
-                        var queueVisibilityDelayOrNull = GetQueueVisibilityDelayOrNull(headers);
+                        var timeToLiveOrNull = GetTimeToBeReceivedOrNull(headers);
+                        var visibilityDelayOrNull = GetQueueVisibilityDelayOrNull(headers);
                         var cloudQueueMessage = Serialize(headers, message.Body);
 
                         try
                         {
                             await queue.AddMessageAsync(
-                                cloudQueueMessage,
-                                timeToBeReceivedOrNull,
-                                queueVisibilityDelayOrNull,
-                                ExponentialRetryRequestOptions,
-                                new OperationContext()
+                                message: cloudQueueMessage,
+                                timeToLive: timeToLiveOrNull,
+                                initialVisibilityDelay: visibilityDelayOrNull,
+                                options: ExponentialRetryRequestOptions,
+                                operationContext: new OperationContext()
                             );
                         }
                         catch (Exception exception)
@@ -194,10 +194,10 @@ public class AzureStorageQueuesTransport : ITransport, IInitializable, IDisposab
         {
             // fetch single message
             var cloudQueueMessage = await inputQueue.GetMessageAsync(
-                _initialVisibilityDelay,
-                DefaultQueueRequestOptions,
-                new OperationContext(),
-                cancellationToken
+                visibilityTimeout: _initialVisibilityDelay,
+                options: DefaultQueueRequestOptions,
+                operationContext: new OperationContext(),
+                cancellationToken: cancellationToken
             );
 
             if (cloudQueueMessage == null) return null;
@@ -219,11 +219,11 @@ public class AzureStorageQueuesTransport : ITransport, IInitializable, IDisposab
         }
 
         var cloudQueueMessages = await inputQueue.GetMessagesAsync(
-            _options.Prefetch.Value,
-            _initialVisibilityDelay,
-            DefaultQueueRequestOptions,
-            new OperationContext(),
-            cancellationToken
+            messageCount: _options.Prefetch.Value,
+            visibilityTimeout: _initialVisibilityDelay,
+            options: DefaultQueueRequestOptions,
+            operationContext: new OperationContext(),
+            cancellationToken: cancellationToken
         );
 
         foreach (var message in cloudQueueMessages)
@@ -245,7 +245,6 @@ public class AzureStorageQueuesTransport : ITransport, IInitializable, IDisposab
         var messageId = cloudQueueMessage.Id;
         var popReceipt = cloudQueueMessage.PopReceipt;
 
-
         context.OnCompleted(async ctx =>
         {
             try
@@ -253,10 +252,10 @@ public class AzureStorageQueuesTransport : ITransport, IInitializable, IDisposab
                 // if we get this far, don't pass on the cancellation token
                 // ReSharper disable once MethodSupportsCancellation
                 await inputQueue.DeleteMessageAsync(
-                    messageId,
-                    popReceipt,
-                    ExponentialRetryRequestOptions,
-                    new OperationContext()
+                    messageId: messageId,
+                    popReceipt: popReceipt,
+                    options: ExponentialRetryRequestOptions,
+                    operationContext: new OperationContext()
                 );
             }
             catch (Exception exception)
@@ -424,6 +423,5 @@ public class AzureStorageQueuesTransport : ITransport, IInitializable, IDisposab
     public void Dispose()
     {
         _messageLockRenewalTask?.Dispose();
-
     }
 }
