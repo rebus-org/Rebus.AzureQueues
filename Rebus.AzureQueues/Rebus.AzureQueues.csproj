@@ -1,52 +1,25 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project Sdk="Microsoft.NET.Sdk" ToolsVersion="15.0">
- <PropertyGroup>
-    <OutputType>Library</OutputType>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>Rebus</RootNamespace>
-    <AssemblyName>Rebus.AzureQueues</AssemblyName>
-    <TargetFrameworks>net462;netstandard2.0</TargetFrameworks>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <Authors>mookid8000</Authors>
-    <PackageLicenseUrl></PackageLicenseUrl>
-    <PackageProjectUrl>https://rebus.fm/what-is-rebus/</PackageProjectUrl>
-    <Copyright>Copyright 2012-2016</Copyright>
-    <PackageTags>rebus events</PackageTags>
-    <PackageIconUrl></PackageIconUrl>
-    <PackageDescription>Provides an Azure Storage Queues transport for Rebus</PackageDescription>
-    <RepositoryUrl>https://github.com/rebus-org/Rebus</RepositoryUrl>
-    <RepositoryType>git</RepositoryType>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageIcon>little_rebusbus2_copy-500x500.png</PackageIcon>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-    <DocumentationFile>bin\Debug\Rebus.AzureQueues.xml</DocumentationFile>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>pdbonly</DebugType>
-    <Optimize>true</Optimize>
-    <OutputPath>bin\Release\</OutputPath>
-    <DefineConstants>RELEASE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <DocumentationFile>bin\Release\Rebus.AzureQueues.xml</DocumentationFile>
-  </PropertyGroup>
-  <ItemGroup>
-    <PackageReference Include="microsoft.azure.storage.queue" Version="11.2.2" />
-    <PackageReference Include="rebus" Version="6.0.0" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="..\artwork\little_rebusbus2_copy-500x500.png">
-      <Pack>True</Pack>
-      <PackagePath></PackagePath>
-    </None>
-  </ItemGroup>
+﻿<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<RootNamespace>Rebus</RootNamespace>
+		<TargetFramework>netstandard2.0</TargetFramework>
+		<Authors>mookid8000</Authors>
+		<PackageProjectUrl>https://rebus.fm/what-is-rebus/</PackageProjectUrl>
+		<Copyright>Copyright 2012-2016</Copyright>
+		<PackageTags>rebus events</PackageTags>
+		<PackageDescription>Provides an Azure Storage Queues transport for Rebus</PackageDescription>
+		<RepositoryUrl>https://github.com/rebus-org/Rebus</RepositoryUrl>
+		<RepositoryType>git</RepositoryType>
+		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+		<PackageIcon>little_rebusbus2_copy-500x500.png</PackageIcon>
+	</PropertyGroup>
+	<ItemGroup>
+		<PackageReference Include="microsoft.azure.storage.queue" Version="11.2.2" />
+		<PackageReference Include="rebus" Version="6.0.0" />
+	</ItemGroup>
+	<ItemGroup>
+		<None Include="..\artwork\little_rebusbus2_copy-500x500.png">
+			<Pack>True</Pack>
+			<PackagePath></PackagePath>
+		</None>
+	</ItemGroup>
 </Project>

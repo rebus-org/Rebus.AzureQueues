@@ -17,14 +17,7 @@ namespace Rebus.AzureQueues.Tests
                                          ?? ConnectionStringFromEnvironmentVariable("rebus2_storage_connection_string")
                                          ?? "UseDevelopmentStorage=true";
 
-        static string GetBaseDirectory()
-        {
-#if NETSTANDARD1_6
-            return AppContext.BaseDirectory;
-#else
-            return AppDomain.CurrentDomain.BaseDirectory;
-#endif
-        }
+        static string GetBaseDirectory() => AppContext.BaseDirectory;
 
         static string ConnectionStringFromFileOrNull(string filePath)
         {
