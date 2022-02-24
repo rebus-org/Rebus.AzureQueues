@@ -17,17 +17,21 @@ class MessageLockRenewer
         _messageReceiver = messageReceiver;
         _nextRenewal = GetTimeOfNextRenewal();
     }
-
+    public string PopReceipt => _message.PopReceipt;
     public string MessageId => _message.Id;
 
     public bool IsDue => DateTimeOffset.Now >= _nextRenewal;
 
     public async Task Renew()
     {
+        
         // intentionally let exceptions bubble out here, so the caller can log it as a warning
         await _messageReceiver.UpdateMessageAsync(_message, TimeSpan.FromMinutes(5), MessageUpdateFields.Visibility);
 
         _nextRenewal = GetTimeOfNextRenewal();
+
+       
+
     }
 
     DateTimeOffset GetTimeOfNextRenewal()

@@ -247,6 +247,11 @@ public class AzureStorageQueuesTransport : ITransport, IInitializable, IDisposab
 
         context.OnCompleted(async ctx =>
         {
+            //if the message has been Automatic renewed - the popreceipt has changed since setup
+            if (_options.AutomaticPeekLockRenewalEnabled && _messageLockRenewers.TryRemove(messageId, out var updatedMessage))
+            {
+                popReceipt = updatedMessage.PopReceipt;
+            }
             try
             {
                 // if we get this far, don't pass on the cancellation token
@@ -262,7 +267,7 @@ public class AzureStorageQueuesTransport : ITransport, IInitializable, IDisposab
             {
                 throw new RebusApplicationException(exception, $"Could not delete message with ID {messageId} and pop receipt {popReceipt} from the input queue");
             }
-            _messageLockRenewers.TryRemove(messageId, out _);
+
         });
 
         context.OnAborted(ctx =>
