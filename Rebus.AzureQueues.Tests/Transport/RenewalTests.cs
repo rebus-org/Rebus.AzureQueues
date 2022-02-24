@@ -91,7 +91,7 @@ public class AzureQueuePeekLockRenewalTest : FixtureBase
 
         var message = await _transport.Receive(scope.TransactionContext, CancellationToken.None);
 
-        scope.Complete();
+        await scope.CompleteAsync();
 
         if (message != null)
         {
