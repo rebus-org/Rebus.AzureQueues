@@ -13,8 +13,8 @@ class MessageLockRenewer
 
     public MessageLockRenewer(CloudQueueMessage message, CloudQueue messageReceiver)
     {
-        _message = message;
-        _messageReceiver = messageReceiver;
+        _message = message ?? throw new ArgumentNullException(nameof(message));
+        _messageReceiver = messageReceiver ?? throw new ArgumentNullException(nameof(messageReceiver));
         _nextRenewal = GetTimeOfNextRenewal();
     }
     public string PopReceipt => _message.PopReceipt;
@@ -24,14 +24,10 @@ class MessageLockRenewer
 
     public async Task Renew()
     {
-        
         // intentionally let exceptions bubble out here, so the caller can log it as a warning
         await _messageReceiver.UpdateMessageAsync(_message, TimeSpan.FromMinutes(5), MessageUpdateFields.Visibility);
 
         _nextRenewal = GetTimeOfNextRenewal();
-
-       
-
     }
 
     DateTimeOffset GetTimeOfNextRenewal()
@@ -44,5 +40,5 @@ class MessageLockRenewer
         return now + halfOfRemainingTime;
     }
 
-    DateTimeOffset LockedUntil => _message.NextVisibleTime.Value;
+    DateTimeOffset LockedUntil => _message.NextVisibleTime ?? DateTimeOffset.MinValue;
 }

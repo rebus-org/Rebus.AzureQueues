@@ -15,6 +15,8 @@ using Rebus.Extensions;
 using Rebus.Threading.SystemThreadingTimer;
 using Rebus.Tests.Contracts.Extensions;
 using System.Linq;
+using Rebus.Time;
+// ReSharper disable AccessToDisposedClosure
 
 namespace Rebus.AzureQueues.Tests.Transport;
 
@@ -24,22 +26,23 @@ public class AzureQueuePeekLockRenewalTest : FixtureBase
     static readonly string ConnectionString = AzureConfig.ConnectionString;
     static readonly string QueueName = TestConfig.GetName("input");
 
-    readonly ConsoleLoggerFactory _consoleLoggerFactory = new ConsoleLoggerFactory(false);
+    readonly TimeSpan _visibilityTimeout = TimeSpan.FromSeconds(20);
 
     BuiltinHandlerActivator _activator;
     AzureStorageQueuesTransport _transport;
-    ListLoggerFactory _listLoggerFactory = new ListLoggerFactory(outputToConsole: true, detailed: true);
+    ListLoggerFactory _listLoggerFactory;
     IBus _bus;
     IBusStarter _busStarter;
-    TimeSpan _visibilityTimeout = TimeSpan.FromSeconds(20);
+
     protected override void SetUp()
     {
-        _transport = new AzureStorageQueuesTransport(AzureConfig.StorageAccount, QueueName, _consoleLoggerFactory, new AzureStorageQueuesTransportOptions(), new Time.DefaultRebusTime(), new SystemThreadingTimerAsyncTaskFactory(new ConsoleLoggerFactory(false)));
+        _listLoggerFactory = new ListLoggerFactory(outputToConsole: true, detailed: true);
 
+        _transport = new AzureStorageQueuesTransport(AzureConfig.StorageAccount, QueueName, _listLoggerFactory, new AzureStorageQueuesTransportOptions(), new DefaultRebusTime(), new SystemThreadingTimerAsyncTaskFactory(new ConsoleLoggerFactory(false)));
         _transport.Initialize();
         _transport.PurgeInputQueue();
 
-        _activator = new BuiltinHandlerActivator();
+        _activator = Using(new BuiltinHandlerActivator());
 
         _busStarter = Configure.With(_activator)
             .Logging(l => l.Use(_listLoggerFactory))
@@ -56,20 +59,16 @@ public class AzureQueuePeekLockRenewalTest : FixtureBase
             .Create();
 
         _bus = _busStarter.Bus;
-
-        Using(_bus);
     }
-
 
     [Test]
     public async Task ItWorks()
     {
-        var gotMessage = new ManualResetEvent(false);
+        using var gotMessage = new ManualResetEvent(false);
 
-        _activator.Handle<string>(async (bus, context, message) =>
+        _activator.Handle<string>(async (_, context, _) =>
         {
-            Console.WriteLine($"Got message with ID {context.Headers.GetValue(Headers.MessageId)} - waiting timout + 30 secs minutes....");
-
+            Console.WriteLine($"Got message with ID {context.Headers.GetValue(Headers.MessageId)} - waiting timeout + 30 secs minutes....");
 
             await Task.Delay(_visibilityTimeout + TimeSpan.FromSeconds(30));
 
@@ -83,9 +82,9 @@ public class AzureQueuePeekLockRenewalTest : FixtureBase
         await _bus.SendLocal("hej med dig min ven!");
 
         //would appear after visibility timout - if it wasn't  extended
-        await Task.Delay(_visibilityTimeout + TimeSpan.FromSeconds(2));
+        await Task.Delay(_visibilityTimeout + TimeSpan.FromSeconds(5));
 
-        
+
         // see if queue is empty
         using var scope = new RebusTransactionScope();
 
@@ -103,10 +102,7 @@ public class AzureQueuePeekLockRenewalTest : FixtureBase
 
         //make absolutely sure that the transaction has finished
         await Task.Delay(TimeSpan.FromSeconds(10));
-       
-        Assert.IsFalse(_listLoggerFactory.Any(l => l.Level == LogLevel.Error),"had an error when handling the message.. check the logs");
 
-
-
+        Assert.IsFalse(_listLoggerFactory.Any(l => l.Level == LogLevel.Error), "had an error when handling the message.. check the logs");
     }
 }

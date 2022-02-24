@@ -243,15 +243,14 @@ public class AzureStorageQueuesTransport : ITransport, IInitializable, IDisposab
     void SetUpCompletion(ITransactionContext context, CloudQueueMessage cloudQueueMessage, CloudQueue inputQueue)
     {
         var messageId = cloudQueueMessage.Id;
-        var popReceipt = cloudQueueMessage.PopReceipt;
 
-        context.OnCompleted(async ctx =>
+        context.OnCompleted(async _ =>
         {
             //if the message has been Automatic renewed - the popreceipt has changed since setup
-            if (_options.AutomaticPeekLockRenewalEnabled && _messageLockRenewers.TryRemove(messageId, out var updatedMessage))
-            {
-                popReceipt = updatedMessage.PopReceipt;
-            }
+            var popReceipt = _options.AutomaticPeekLockRenewalEnabled && _messageLockRenewers.TryRemove(messageId, out var updatedMessage)
+                ? updatedMessage.PopReceipt
+                : cloudQueueMessage.PopReceipt;
+
             try
             {
                 // if we get this far, don't pass on the cancellation token
@@ -267,7 +266,6 @@ public class AzureStorageQueuesTransport : ITransport, IInitializable, IDisposab
             {
                 throw new RebusApplicationException(exception, $"Could not delete message with ID {messageId} and pop receipt {popReceipt} from the input queue");
             }
-
         });
 
         context.OnAborted(ctx =>
@@ -306,7 +304,7 @@ public class AzureStorageQueuesTransport : ITransport, IInitializable, IDisposab
         }
     }
 
-    TimeSpan? GetQueueVisibilityDelayOrNull(Dictionary<string, string> headers)
+    TimeSpan? GetQueueVisibilityDelayOrNull(IDictionary<string, string> headers)
     {
         if (!_options.UseNativeDeferredMessages)
         {
@@ -361,7 +359,7 @@ public class AzureStorageQueuesTransport : ITransport, IInitializable, IDisposab
     {
         if (Address != null)
         {
-            _log.Info("Initializing Azure Storage Queues transport with queue '{0}'", Address);
+            _log.Info("Initializing Azure Storage Queues transport with queue {queueName}", Address);
             CreateQueue(Address);
             if (_options.AutomaticPeekLockRenewalEnabled)
             {
@@ -383,7 +381,7 @@ public class AzureStorageQueuesTransport : ITransport, IInitializable, IDisposab
 
             if (!await queue.ExistsAsync()) return;
 
-            _log.Info("Purging storage queue '{0}' (purging by deleting all messages)", Address);
+            _log.Info("Purging storage queue {queueName} (purging by deleting all messages)", Address);
 
             try
             {
@@ -420,7 +418,6 @@ public class AzureStorageQueuesTransport : ITransport, IInitializable, IDisposab
             }
         }));
     }
-
 
     /// <summary>
     /// Disposes background running tasks

@@ -23,11 +23,11 @@ public static class AzureConfig
     {
         if (!File.Exists(filePath))
         {
-            Console.WriteLine("Could not find file {0}", filePath);
+            Console.WriteLine($"Could not find file {filePath}");
             return null;
         }
 
-        Console.WriteLine("Using Azure Storage connection string from file {0}", filePath);
+        Console.WriteLine($"Using Azure Storage connection string from file {filePath}");
         return File.ReadAllText(filePath);
     }
 
@@ -37,11 +37,11 @@ public static class AzureConfig
 
         if (value == null)
         {
-            Console.WriteLine("Could not find env variable {0}", environmentVariableName);
+            Console.WriteLine($"Could not find env variable {environmentVariableName}");
             return null;
         }
 
-        Console.WriteLine("Using Azure Storage connection string from env variable {0}", environmentVariableName);
+        Console.WriteLine($"Using Azure Storage connection string from env variable {environmentVariableName}");
 
         return value;
     }
