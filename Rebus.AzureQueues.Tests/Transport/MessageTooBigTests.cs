@@ -9,38 +9,42 @@ using Rebus.Tests.Contracts.Utilities;
 using Rebus.Threading.SystemThreadingTimer;
 using Rebus.Extensions;
 using Rebus.Time;
-using Rebus.Transport;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Rebus.Messages;
-using Rebus.Tests.Contracts.Extensions;
 using System.Linq;
 using Rebus.Retry.Simple;
+using Rebus.Tests.Contracts.Extensions;
+// ReSharper disable ArgumentsStyleLiteral
+
+// ReSharper disable AccessToDisposedClosure
 
 namespace Rebus.AzureQueues.Tests.Transport
 {
     [TestFixture]
     public class MessageTooBigTests : FixtureBase
     {
-
         static readonly string ConnectionString = AzureConfig.ConnectionString;
-        static readonly string QueueName = TestConfig.GetName("input");
 
+        readonly TimeSpan InitialTimeout = TimeSpan.FromSeconds(6);
+        readonly string queueName = TestConfig.GetName("input");
+        readonly string errorQueueName = TestConfig.GetName("myerrorqueue");
 
-
-        BuiltinHandlerActivator _activator;
         AzureStorageQueuesTransport _errorQueueListener;
+        BuiltinHandlerActivator _activator;
         ListLoggerFactory _listLoggerFactory;
-        IBus _bus;
         IBusStarter _busStarter;
-        private const string MyErrorQueueName = "myerrorqueue";
-        private TimeSpan InitialTimeout = TimeSpan.FromSeconds(6);
+        IBus _bus;
+
         protected override void SetUp()
         {
             _listLoggerFactory = new ListLoggerFactory(outputToConsole: true, detailed: true);
 
-            _errorQueueListener = new AzureStorageQueuesTransport(AzureConfig.StorageAccount, MyErrorQueueName, _listLoggerFactory, new AzureStorageQueuesTransportOptions(), new DefaultRebusTime(), new SystemThreadingTimerAsyncTaskFactory(new ConsoleLoggerFactory(false)));
+            _errorQueueListener = new AzureStorageQueuesTransport(AzureConfig.StorageAccount, errorQueueName, _listLoggerFactory, new AzureStorageQueuesTransportOptions(), new DefaultRebusTime(), new SystemThreadingTimerAsyncTaskFactory(_listLoggerFactory));
+
+            Using(_errorQueueListener);
+
             _errorQueueListener.Initialize();
             _errorQueueListener.PurgeInputQueue();
 
@@ -48,30 +52,56 @@ namespace Rebus.AzureQueues.Tests.Transport
 
             _busStarter = Configure.With(_activator)
                 .Logging(l => l.Use(_listLoggerFactory))
-                .Transport(t => t.UseAzureStorageQueues(ConnectionString, QueueName, new AzureStorageQueuesTransportOptions()
+                .Transport(t => t.UseAzureStorageQueues(ConnectionString, queueName, new AzureStorageQueuesTransportOptions
                 {
                     AutomaticPeekLockRenewalEnabled = true,
                     InitialVisibilityDelay = InitialTimeout,
-
                 }))
                 .Options(o =>
                 {
-                    o.SimpleRetryStrategy(MyErrorQueueName);
+                    o.SimpleRetryStrategy(errorQueueName);
                     o.SetNumberOfWorkers(1);
                     o.SetMaxParallelism(1);
-
                 })
                 .Create();
 
             _bus = _busStarter.Bus;
         }
 
-        private Random _random = new Random();
         [Test]
-
-        public async Task Should_put_incoming_message_on_error_queue_when_outgoing_is_too_big()
+        public async Task Should_put_incoming_message_on_error_queue_when_outgoing_is_too_big_WithoutRenewal()
         {
             using var gotCalledFiveTimes = new CountdownEvent(5);
+
+            _activator.Handle<string>(async (innerBus, context, _) =>
+            {
+                Console.WriteLine($"Got message with ID {context.Headers.GetValue(Headers.MessageId)} - Sending off huge message");
+
+                var hugeMessage = GetHugeMessage();
+                await innerBus.SendLocal(hugeMessage);
+                gotCalledFiveTimes.Signal();
+
+                Console.WriteLine($"{gotCalledFiveTimes.CurrentCount} tries left");
+            });
+
+            _busStarter.Start();
+
+            await _bus.SendLocal("Get going....");
+
+            gotCalledFiveTimes.Wait(TimeSpan.FromSeconds(120));
+
+            //There should now be a message in the error queue.
+            _ = await _errorQueueListener.WaitForNextMessage(timeoutSeconds: 5);
+
+            //the error should be logged
+            Assert.IsTrue(_listLoggerFactory.Any(l => l.Level == LogLevel.Error));
+        }
+
+        [Test]
+        public async Task Should_put_incoming_message_on_error_queue_when_outgoing_is_too_big_WithRenewal()
+        {
+            using var gotCalledFiveTimes = new CountdownEvent(5);
+
             _activator.Handle<string>(async (innerBus, context, _) =>
             {
                 Console.WriteLine($"Got message with ID {context.Headers.GetValue(Headers.MessageId)} - Sending off huge message");
@@ -79,38 +109,34 @@ namespace Rebus.AzureQueues.Tests.Transport
                 //first wait to ensure renewal has been effectuated
                 await Task.Delay(InitialTimeout + TimeSpan.FromSeconds(10));
 
-                byte[] bytes = new byte[64_000];
-                _random.NextBytes(bytes);
-                await innerBus.SendLocal(new HugeMessage(bytes));
+                var hugeMessage = GetHugeMessage();
+                await innerBus.SendLocal(hugeMessage);
                 gotCalledFiveTimes.Signal();
-                Console.WriteLine(gotCalledFiveTimes.CurrentCount + " tries left");
+
+                Console.WriteLine($"{gotCalledFiveTimes.CurrentCount} tries left");
             });
 
             _busStarter.Start();
 
             await _bus.SendLocal("Get going....");
 
-
             gotCalledFiveTimes.Wait(TimeSpan.FromSeconds(120));
 
             //There should now be a message in the error queue.
-            using var scope = new RebusTransactionScope();
-            var message = await _errorQueueListener.Receive(scope.TransactionContext, CancellationToken.None);
-            await scope.CompleteAsync();
-
-            if (message == null)
-            {
-                throw new AssertionException(
-                    $"Did not receive a message.");
-            }
-
-            //make absolutely sure that the transaction has finished
-            await Task.Delay(TimeSpan.FromSeconds(5));
+            _ = await _errorQueueListener.WaitForNextMessage(timeoutSeconds: 5);
 
             //the error should be logged
             Assert.IsTrue(_listLoggerFactory.Any(l => l.Level == LogLevel.Error));
-
         }
+
+        static HugeMessage GetHugeMessage()
+        {
+            var bytes = new byte[64_000];
+            Random.Shared.NextBytes(bytes);
+            var hugeMessage = new HugeMessage(bytes);
+            return hugeMessage;
+        }
+
         public class HugeMessage
         {
             public HugeMessage(byte[] bytes)
