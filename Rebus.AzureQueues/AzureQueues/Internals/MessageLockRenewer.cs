@@ -1,44 +1,53 @@
-﻿using Microsoft.Azure.Storage.Queue;
-using System;
+﻿using System;
 using System.Threading.Tasks;
+using Azure.Storage.Queues;
+using Azure.Storage.Queues.Models;
 
 namespace Rebus.AzureQueues.Internals;
 
 class MessageLockRenewer
 {
-    readonly CloudQueueMessage _message;
-    readonly CloudQueue _messageReceiver;
+    readonly QueueClient _queueClient;
+    readonly QueueMessage _message;
 
     DateTimeOffset _nextRenewal;
+    DateTimeOffset? _nextVisibleOn;
 
-    public MessageLockRenewer(CloudQueueMessage message, CloudQueue messageReceiver)
+    public MessageLockRenewer(QueueMessage message, QueueClient queueClient)
     {
         _message = message ?? throw new ArgumentNullException(nameof(message));
-        _messageReceiver = messageReceiver ?? throw new ArgumentNullException(nameof(messageReceiver));
+        _queueClient = queueClient ?? throw new ArgumentNullException(nameof(queueClient));
+    
+        MessageId = message.MessageId;
+        PopReceipt = message.PopReceipt;
+        _nextVisibleOn = message.NextVisibleOn;
+
         _nextRenewal = GetTimeOfNextRenewal();
     }
-    public string PopReceipt => _message.PopReceipt;
-    public string MessageId => _message.Id;
+
+    public string MessageId { get; }
+    public string PopReceipt { get; private set; }
 
     public bool IsDue => DateTimeOffset.Now >= _nextRenewal;
 
     public async Task Renew()
     {
         // intentionally let exceptions bubble out here, so the caller can log it as a warning
-        await _messageReceiver.UpdateMessageAsync(_message, TimeSpan.FromMinutes(5), MessageUpdateFields.Visibility);
+        var response = await _queueClient.UpdateMessageAsync(MessageId, PopReceipt, visibilityTimeout: TimeSpan.FromMinutes(5));
+
+        PopReceipt = response.Value.PopReceipt;
+        _nextVisibleOn = response.Value.NextVisibleOn;
 
         _nextRenewal = GetTimeOfNextRenewal();
     }
 
     DateTimeOffset GetTimeOfNextRenewal()
     {
-        var now = DateTimeOffset.Now;
-
-        var remainingTime = LockedUntil - now;
+        var remainingTime = LockedUntil - DateTimeOffset.Now;
         var halfOfRemainingTime = TimeSpan.FromMinutes(0.5 * remainingTime.TotalMinutes);
 
-        return now + halfOfRemainingTime;
+        return DateTimeOffset.Now + halfOfRemainingTime;
     }
 
-    DateTimeOffset LockedUntil => _message.NextVisibleTime ?? DateTimeOffset.MinValue;
+    DateTimeOffset LockedUntil => _nextVisibleOn ?? DateTimeOffset.MinValue;
 }

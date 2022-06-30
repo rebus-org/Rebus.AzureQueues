@@ -1,6 +1,5 @@
 ﻿using System;
 using System.IO;
-using Microsoft.Azure.Storage;
 using Rebus.AzureQueues.Transport;
 using Rebus.Config;
 using Rebus.Logging;
@@ -11,8 +10,6 @@ namespace Rebus.AzureQueues.Tests;
 
 public static class AzureConfig
 {
-    public static CloudStorageAccount StorageAccount => CloudStorageAccount.Parse(ConnectionString);
-
     public static string ConnectionString => ConnectionStringFromFileOrNull(Path.Combine(GetBaseDirectory(), "azure_storage_connection_string.txt"))
                                              ?? ConnectionStringFromEnvironmentVariable("rebus2_storage_connection_string")
                                              ?? "UseDevelopmentStorage=true";
@@ -47,7 +44,7 @@ public static class AzureConfig
     }
 
     public static void PurgeQueue(string queueName) => new AzureStorageQueuesTransport(
-            StorageAccount,
+            new ConnectionStringQueueClientFactory(ConnectionString),
             queueName,
             new NullLoggerFactory(),
             new AzureStorageQueuesTransportOptions(),

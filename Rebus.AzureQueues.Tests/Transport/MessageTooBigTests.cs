@@ -41,7 +41,7 @@ namespace Rebus.AzureQueues.Tests.Transport
         {
             _listLoggerFactory = new ListLoggerFactory(outputToConsole: true, detailed: true);
 
-            _errorQueueListener = new AzureStorageQueuesTransport(AzureConfig.StorageAccount, errorQueueName, _listLoggerFactory, new AzureStorageQueuesTransportOptions(), new DefaultRebusTime(), new SystemThreadingTimerAsyncTaskFactory(_listLoggerFactory));
+            _errorQueueListener = new AzureStorageQueuesTransport(new ConnectionStringQueueClientFactory(AzureConfig.ConnectionString), errorQueueName, _listLoggerFactory, new AzureStorageQueuesTransportOptions(), new DefaultRebusTime(), new SystemThreadingTimerAsyncTaskFactory(_listLoggerFactory));
 
             Using(_errorQueueListener);
 

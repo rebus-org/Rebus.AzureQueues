@@ -1,6 +1,5 @@
 ﻿using System;
-using Microsoft.Azure.Storage;
-using Microsoft.Azure.Storage.Queue;
+using Azure.Storage.Queues;
 using Rebus.AzureQueues;
 using Rebus.AzureQueues.Transport;
 using Rebus.Logging;
@@ -39,9 +38,10 @@ Configure.With(...)
         /// </summary>
         public static void UseAzureStorageQueuesAsOneWayClient(this StandardConfigurer<ITransport> configurer, string storageAccountConnectionString, AzureStorageQueuesTransportOptions options = null)
         {
-            var storageAccount = CloudStorageAccount.Parse(storageAccountConnectionString);
+            if (configurer == null) throw new ArgumentNullException(nameof(configurer));
+            if (storageAccountConnectionString == null) throw new ArgumentNullException(nameof(storageAccountConnectionString));
 
-            Register(configurer, null, storageAccount, options);
+            Register(configurer, null, new ConnectionStringQueueClientFactory(storageAccountConnectionString), options);
 
             OneWayClientBackdoor.ConfigureOneWayClient(configurer);
         }
@@ -51,59 +51,35 @@ Configure.With(...)
         /// </summary>
         public static void UseAzureStorageQueues(this StandardConfigurer<ITransport> configurer, string storageAccountConnectionString, string inputQueueAddress, AzureStorageQueuesTransportOptions options = null)
         {
-            var storageAccount = CloudStorageAccount.Parse(storageAccountConnectionString);
+            if (configurer == null) throw new ArgumentNullException(nameof(configurer));
+            if (storageAccountConnectionString == null) throw new ArgumentNullException(nameof(storageAccountConnectionString));
+            if (inputQueueAddress == null) throw new ArgumentNullException(nameof(inputQueueAddress));
 
-            Register(configurer, inputQueueAddress, storageAccount, options);
+            Register(configurer, inputQueueAddress, new ConnectionStringQueueClientFactory(storageAccountConnectionString), options);
         }
 
         /// <summary>
-        /// Configures Rebus to use Azure Storage Queues to transport messages as a one-way client (i.e. will not be able to receive any messages)
+        /// Configures Rebus to use Azure Storage Queues to transport messages, using the given <paramref name="queueClientFactory"/> to obtain the necessary <see cref="QueueClient"/> instances
         /// </summary>
-        public static void UseAzureStorageQueuesAsOneWayClient(this StandardConfigurer<ITransport> configurer, CloudStorageAccount storageAccount, AzureStorageQueuesTransportOptions options = null)
+        public static void UseAzureStorageQueues(this StandardConfigurer<ITransport> configurer, IQueueClientFactory queueClientFactory, string inputQueueAddress, AzureStorageQueuesTransportOptions options = null)
         {
-            Register(configurer, null, storageAccount, options);
+            Register(configurer, inputQueueAddress, queueClientFactory, options);
+        }
+
+        /// <summary>
+        /// Configures Rebus to use Azure Storage Queues to transport messages as a one-way client (i.e. will not be able to receive any messages), using the given <paramref name="queueClientFactory"/> to obtain the necessary <see cref="QueueClient"/> instances
+        /// </summary>
+        public static void UseAzureStorageQueuesAsOneWayClient(this StandardConfigurer<ITransport> configurer, IQueueClientFactory queueClientFactory, AzureStorageQueuesTransportOptions options = null)
+        {
+            Register(configurer, null, queueClientFactory, options);
 
             OneWayClientBackdoor.ConfigureOneWayClient(configurer);
         }
 
-        /// <summary>
-        /// Configures Rebus to use Azure Storage Queues to transport messages
-        /// </summary>
-        public static void UseAzureStorageQueues(this StandardConfigurer<ITransport> configurer, ICloudQueueFactory queueFactory, string inputQueueAddress, AzureStorageQueuesTransportOptions options = null)
-        {
-            Register(configurer, inputQueueAddress, queueFactory, options);
-        }
-
-        /// <summary>
-        /// Configures Rebus to use Azure Storage Queues to transport messages as a one-way client (i.e. will not be able to receive any messages)
-        /// </summary>
-        public static void UseAzureStorageQueuesAsOneWayClient(this StandardConfigurer<ITransport> configurer, ICloudQueueFactory queueFactory, AzureStorageQueuesTransportOptions options = null)
-        {
-            Register(configurer, null, queueFactory, options);
-
-            OneWayClientBackdoor.ConfigureOneWayClient(configurer);
-        }
-
-        /// <summary>
-        /// Configures Rebus to use Azure Storage Queues to transport messages
-        /// </summary>
-        public static void UseAzureStorageQueues(this StandardConfigurer<ITransport> configurer, CloudStorageAccount storageAccount, string inputQueueAddress, AzureStorageQueuesTransportOptions options = null)
-        {
-            Register(configurer, inputQueueAddress, storageAccount, options);
-        }
-
-
-        static void Register(StandardConfigurer<ITransport> configurer, string inputQueueAddress,
-            CloudStorageAccount cloudStorageAccount, AzureStorageQueuesTransportOptions optionsOrNull)
-        {
-            var queueFactory = new CloudQueueClientQueueFactory(cloudStorageAccount.CreateCloudQueueClient());
-            Register(configurer, inputQueueAddress, queueFactory, optionsOrNull);
-        }
-
-        static void Register(StandardConfigurer<ITransport> configurer, string inputQueueAddress, ICloudQueueFactory queueFactory, AzureStorageQueuesTransportOptions optionsOrNull)
+        static void Register(StandardConfigurer<ITransport> configurer, string inputQueueAddress, IQueueClientFactory queueClientFactory, AzureStorageQueuesTransportOptions optionsOrNull)
         {
             if (configurer == null) throw new ArgumentNullException(nameof(configurer));
-            if (queueFactory == null) throw new ArgumentNullException(nameof(queueFactory));
+            if (queueClientFactory == null) throw new ArgumentNullException(nameof(queueClientFactory));
 
             var options = optionsOrNull ?? new AzureStorageQueuesTransportOptions();
 
@@ -112,7 +88,7 @@ Configure.With(...)
                 var asyncTaskFactory = c.Get<IAsyncTaskFactory>();
                 var rebusLoggerFactory = c.Get<IRebusLoggerFactory>();
                 var rebusTime = c.Get<IRebusTime>();
-                return new AzureStorageQueuesTransport(queueFactory, inputQueueAddress, rebusLoggerFactory, options, rebusTime, asyncTaskFactory);
+                return new AzureStorageQueuesTransport(queueClientFactory, inputQueueAddress, rebusLoggerFactory, options, rebusTime, asyncTaskFactory);
             });
 
             if (options.UseNativeDeferredMessages)

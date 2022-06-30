@@ -26,7 +26,7 @@ public class VerifyTimeoutManagerConfiguration : FixtureBase
             .Transport(t =>
             {
                 var options = new AzureStorageQueuesTransportOptions { UseNativeDeferredMessages = false };
-                t.UseAzureStorageQueues(AzureConfig.StorageAccount, TestConfig.GetName("myqueue"), options);
+                t.UseAzureStorageQueues(AzureConfig.ConnectionString, TestConfig.GetName("myqueue"), options);
             })
             .Timeouts(t => t.StoreInMemory())
             .Start();

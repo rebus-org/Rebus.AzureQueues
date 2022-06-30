@@ -12,7 +12,7 @@ namespace Rebus.AzureQueues.Tests.Transport;
 
 public class AzureStorageQueuesTransportFactory : ITransportFactory
 {
-    readonly ConcurrentDictionary<string, AzureStorageQueuesTransport> _transports = new ConcurrentDictionary<string, AzureStorageQueuesTransport>(StringComparer.OrdinalIgnoreCase);
+    readonly ConcurrentDictionary<string, AzureStorageQueuesTransport> _transports = new(StringComparer.OrdinalIgnoreCase);
 
     public ITransport CreateOneWayClient()
     {
@@ -23,7 +23,7 @@ public class AzureStorageQueuesTransportFactory : ITransportFactory
     {
         if (inputQueueAddress == null)
         {
-            var transport = new AzureStorageQueuesTransport(AzureConfig.StorageAccount, null, new ConsoleLoggerFactory(false), new AzureStorageQueuesTransportOptions(), new DefaultRebusTime(),new SystemThreadingTimerAsyncTaskFactory(new ConsoleLoggerFactory(false)));
+            var transport = new AzureStorageQueuesTransport(new ConnectionStringQueueClientFactory(AzureConfig.ConnectionString), null, new ConsoleLoggerFactory(false), new AzureStorageQueuesTransportOptions(), new DefaultRebusTime(),new SystemThreadingTimerAsyncTaskFactory(new ConsoleLoggerFactory(false)));
 
             transport.Initialize();
 
@@ -32,7 +32,7 @@ public class AzureStorageQueuesTransportFactory : ITransportFactory
 
         return _transports.GetOrAdd(inputQueueAddress, address =>
         {
-            var transport = new AzureStorageQueuesTransport(AzureConfig.StorageAccount, inputQueueAddress, new ConsoleLoggerFactory(false), new AzureStorageQueuesTransportOptions(), new DefaultRebusTime(), new SystemThreadingTimerAsyncTaskFactory(new ConsoleLoggerFactory(false)));
+            var transport = new AzureStorageQueuesTransport(new ConnectionStringQueueClientFactory(AzureConfig.ConnectionString), inputQueueAddress, new ConsoleLoggerFactory(false), new AzureStorageQueuesTransportOptions(), new DefaultRebusTime(), new SystemThreadingTimerAsyncTaskFactory(new ConsoleLoggerFactory(false)));
 
             transport.PurgeInputQueue();
 

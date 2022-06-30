@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Azure.Storage;
 using NUnit.Framework;
 using Rebus.Activation;
 using Rebus.Config;
@@ -22,12 +21,9 @@ public class AlternativeTimeoutManager : FixtureBase
     static readonly string TimeoutManagerQueueName = TestConfig.GetName("timeouts");
 
     BuiltinHandlerActivator _activator;
-    CloudStorageAccount _storageAccount;
 
     protected override void SetUp()
     {
-        _storageAccount = CloudStorageAccount.Parse(AzureConfig.ConnectionString);
-
         AzureConfig.PurgeQueue(QueueName);
         AzureConfig.PurgeQueue(TimeoutManagerQueueName);
 
@@ -53,7 +49,7 @@ public class AlternativeTimeoutManager : FixtureBase
             {
                 var options = new AzureStorageQueuesTransportOptions { UseNativeDeferredMessages = false };
 
-                t.UseAzureStorageQueues(_storageAccount, QueueName, options: options);
+                t.UseAzureStorageQueues(AzureConfig.ConnectionString, QueueName, options: options);
             })
             .Timeouts(t => t.Register(c => new InMemoryTimeoutManager(new DefaultRebusTime())))
             .Start();
@@ -72,7 +68,7 @@ public class AlternativeTimeoutManager : FixtureBase
             {
                 var options = new AzureStorageQueuesTransportOptions { UseNativeDeferredMessages = false };
 
-                t.UseAzureStorageQueues(_storageAccount, TimeoutManagerQueueName, options: options);
+                t.UseAzureStorageQueues(AzureConfig.ConnectionString, TimeoutManagerQueueName, options: options);
             })
             .Timeouts(t => t.Register(c => new InMemoryTimeoutManager(new DefaultRebusTime())))
             .Start();
@@ -91,7 +87,7 @@ public class AlternativeTimeoutManager : FixtureBase
             {
                 var options = new AzureStorageQueuesTransportOptions { UseNativeDeferredMessages = false };
 
-                t.UseAzureStorageQueues(_storageAccount, QueueName, options: options);
+                t.UseAzureStorageQueues(AzureConfig.ConnectionString, QueueName, options: options);
             })
             .Timeouts(t => t.UseExternalTimeoutManager(TimeoutManagerQueueName))
             .Start();

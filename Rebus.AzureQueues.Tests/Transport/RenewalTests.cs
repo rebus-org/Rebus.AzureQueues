@@ -38,7 +38,7 @@ public class AzureQueuePeekLockRenewalTest : FixtureBase
     {
         _listLoggerFactory = new ListLoggerFactory(outputToConsole: true, detailed: true);
 
-        _transport = new AzureStorageQueuesTransport(AzureConfig.StorageAccount, QueueName, _listLoggerFactory, new AzureStorageQueuesTransportOptions(), new DefaultRebusTime(), new SystemThreadingTimerAsyncTaskFactory(new ConsoleLoggerFactory(false)));
+        _transport = new AzureStorageQueuesTransport(new ConnectionStringQueueClientFactory(AzureConfig.ConnectionString), QueueName, _listLoggerFactory, new AzureStorageQueuesTransportOptions(), new DefaultRebusTime(), new SystemThreadingTimerAsyncTaskFactory(new ConsoleLoggerFactory(false)));
         _transport.Initialize();
         _transport.PurgeInputQueue();
 

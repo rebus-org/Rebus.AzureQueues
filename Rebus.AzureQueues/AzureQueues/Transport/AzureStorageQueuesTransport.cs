@@ -5,10 +5,8 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Azure.Storage;
-using Microsoft.Azure.Storage.Queue;
-using Microsoft.Azure.Storage.RetryPolicies;
-using Newtonsoft.Json;
+using Azure.Storage.Queues;
+using Azure.Storage.Queues.Models;
 using Rebus.AzureQueues.Internals;
 using Rebus.Bus;
 using Rebus.Config;
@@ -32,32 +30,19 @@ namespace Rebus.AzureQueues.Transport;
 public class AzureStorageQueuesTransport : ITransport, IInitializable, IDisposable
 {
     const string QueueNameValidationRegex = "^[a-z0-9](?!.*--)[a-z0-9-]{1,61}[a-z0-9]$";
-    static readonly QueueRequestOptions ExponentialRetryRequestOptions = new() { RetryPolicy = new ExponentialRetry() };
-    static readonly QueueRequestOptions DefaultQueueRequestOptions = new();
     readonly ConcurrentDictionary<string, MessageLockRenewer> _messageLockRenewers = new();
+    readonly ConcurrentQueue<QueueMessage> _prefetchedMessages = new();
     readonly AzureStorageQueuesTransportOptions _options;
-    readonly ConcurrentQueue<CloudQueueMessage> _prefetchedMessages = new();
     readonly IAsyncTask _messageLockRenewalTask;
     readonly TimeSpan _initialVisibilityDelay;
     readonly ILog _log;
-    readonly ICloudQueueFactory _queueFactory;
+    readonly IQueueClientFactory _queueClientFactory;
     readonly IRebusTime _rebusTime;
 
-
     /// <summary>
-    /// Constructs the transport using a <see cref="CloudStorageAccount"/>
+    /// Constructs the transport using a <see cref="IQueueClientFactory"/>
     /// </summary>
-    public AzureStorageQueuesTransport(CloudStorageAccount storageAccount, string inputQueueName, IRebusLoggerFactory rebusLoggerFactory, AzureStorageQueuesTransportOptions options, IRebusTime rebusTime, IAsyncTaskFactory asyncTaskFactory)
-        : this(new CloudQueueClientQueueFactory(storageAccount.CreateCloudQueueClient()), inputQueueName, rebusLoggerFactory, options, rebusTime, asyncTaskFactory)
-    {
-        if (storageAccount == null) throw new ArgumentNullException(nameof(storageAccount));
-
-    }
-
-    /// <summary>
-    /// Constructs the transport using a <see cref="ICloudQueueFactory"/>
-    /// </summary>
-    public AzureStorageQueuesTransport(ICloudQueueFactory queueFactory, string inputQueueName, IRebusLoggerFactory rebusLoggerFactory, AzureStorageQueuesTransportOptions options, IRebusTime rebusTime, IAsyncTaskFactory asyncTaskFactory)
+    public AzureStorageQueuesTransport(IQueueClientFactory queueClientFactory, string inputQueueName, IRebusLoggerFactory rebusLoggerFactory, AzureStorageQueuesTransportOptions options, IRebusTime rebusTime, IAsyncTaskFactory asyncTaskFactory)
     {
         if (rebusLoggerFactory == null) throw new ArgumentNullException(nameof(rebusLoggerFactory));
 
@@ -65,7 +50,7 @@ public class AzureStorageQueuesTransport : ITransport, IInitializable, IDisposab
         _rebusTime = rebusTime;
         _log = rebusLoggerFactory.GetLogger<AzureStorageQueuesTransport>();
         _initialVisibilityDelay = options.InitialVisibilityDelay;
-        _queueFactory = queueFactory ?? throw new ArgumentNullException(nameof(queueFactory));
+        _queueClientFactory = queueClientFactory ?? throw new ArgumentNullException(nameof(queueClientFactory));
 
         if (inputQueueName != null)
         {
@@ -91,7 +76,7 @@ public class AzureStorageQueuesTransport : ITransport, IInitializable, IDisposab
 
         AsyncHelpers.RunSync(async () =>
         {
-            var queue = await _queueFactory.GetQueue(address);
+            var queue = await _queueClientFactory.GetQueue(address);
             await queue.CreateIfNotExistsAsync();
         });
     }
@@ -114,7 +99,7 @@ public class AzureStorageQueuesTransport : ITransport, IInitializable, IDisposab
                 return Task.WhenAll(messagesByQueue.Select(async batch =>
                 {
                     var queueName = batch.Key;
-                    var queue = await _queueFactory.GetQueue(queueName);
+                    var queue = await _queueClientFactory.GetQueue(queueName);
 
                     await Task.WhenAll(batch.Select(async message =>
                     {
@@ -125,17 +110,15 @@ public class AzureStorageQueuesTransport : ITransport, IInitializable, IDisposab
 
                         try
                         {
-                            await queue.AddMessageAsync(
+                            await queue.SendMessageAsync(
                                 message: cloudQueueMessage,
                                 timeToLive: timeToLiveOrNull,
-                                initialVisibilityDelay: visibilityDelayOrNull,
-                                options: ExponentialRetryRequestOptions,
-                                operationContext: new OperationContext()
+                                visibilityTimeout: visibilityDelayOrNull
                             );
                         }
                         catch (Exception exception)
                         {
-                            var errorText = $"Could not send message with ID {cloudQueueMessage.Id} to '{message.DestinationAddress}'";
+                            var errorText = $"Could not send message with ID {transportMessage.GetMessageId()} to '{message.DestinationAddress}'";
 
                             throw new RebusApplicationException(exception, errorText);
                         }
@@ -175,56 +158,46 @@ public class AzureStorageQueuesTransport : ITransport, IInitializable, IDisposab
             throw new InvalidOperationException("This Azure Storage Queues transport does not have an input queue, which means that it is configured to be a one-way client. Therefore, it is not possible to receive anything.");
         }
 
-        var inputQueue = await _queueFactory.GetQueue(Address);
+        var inputQueue = await _queueClientFactory.GetQueue(Address);
 
-        try
-        {
-            return await InnerReceive(context, cancellationToken, inputQueue);
-        }
-        catch (StorageException exception) when (exception.InnerException is OperationCanceledException && cancellationToken.IsCancellationRequested)
-        {
-            // it's OK, we're exiting... TaskCancelledException wrapped in StorageException is just how the driver rolls
-            return null;
-        }
+        return await InnerReceive(context, cancellationToken, inputQueue);
     }
 
-    async Task<TransportMessage> InnerReceive(ITransactionContext context, CancellationToken cancellationToken, CloudQueue inputQueue)
+    async Task<TransportMessage> InnerReceive(ITransactionContext context, CancellationToken cancellationToken, QueueClient inputQueue)
     {
         if (!_options.Prefetch.HasValue)
         {
             // fetch single message
-            var cloudQueueMessage = await inputQueue.GetMessageAsync(
+            var response = await inputQueue.ReceiveMessageAsync(
                 visibilityTimeout: _initialVisibilityDelay,
-                options: DefaultQueueRequestOptions,
-                operationContext: new OperationContext(),
                 cancellationToken: cancellationToken
             );
 
+            var cloudQueueMessage = response.Value;
             if (cloudQueueMessage == null) return null;
 
             if (_options.AutomaticPeekLockRenewalEnabled)
             {
-                _messageLockRenewers.TryAdd(cloudQueueMessage.Id, new MessageLockRenewer(cloudQueueMessage, inputQueue));
+                _messageLockRenewers.TryAdd(cloudQueueMessage.MessageId, new MessageLockRenewer(cloudQueueMessage, inputQueue));
             }
 
             SetUpCompletion(context, cloudQueueMessage, inputQueue);
-
-            return Deserialize(cloudQueueMessage);
+            return Deserialize(cloudQueueMessage.Body);
         }
 
         if (_prefetchedMessages.TryDequeue(out var dequeuedMessage))
         {
             SetUpCompletion(context, dequeuedMessage, inputQueue);
-            return Deserialize(dequeuedMessage);
+            return Deserialize(dequeuedMessage.Body);
         }
 
-        var cloudQueueMessages = await inputQueue.GetMessagesAsync(
-            messageCount: _options.Prefetch.Value,
+        var batchResponse = await inputQueue.ReceiveMessagesAsync(
+            maxMessages: _options.Prefetch.Value,
             visibilityTimeout: _initialVisibilityDelay,
-            options: DefaultQueueRequestOptions,
-            operationContext: new OperationContext(),
             cancellationToken: cancellationToken
         );
+
+        var cloudQueueMessages = batchResponse.Value;
 
         foreach (var message in cloudQueueMessages)
         {
@@ -234,21 +207,21 @@ public class AzureStorageQueuesTransport : ITransport, IInitializable, IDisposab
         if (_prefetchedMessages.TryDequeue(out var newlyPrefetchedMessage))
         {
             SetUpCompletion(context, newlyPrefetchedMessage, inputQueue);
-            return Deserialize(newlyPrefetchedMessage);
+            return Deserialize(newlyPrefetchedMessage.Body);
         }
 
         return null;
     }
 
-    void SetUpCompletion(ITransactionContext context, CloudQueueMessage cloudQueueMessage, CloudQueue inputQueue)
+    void SetUpCompletion(ITransactionContext context, QueueMessage cloudQueueMessage, QueueClient inputQueue)
     {
-        var messageId = cloudQueueMessage.Id;
+        var messageId = cloudQueueMessage.MessageId;
 
         context.OnCompleted(async _ =>
         {
-            //if the message has been Automatic renewed - the popreceipt has changed since setup
-            var popReceipt = _options.AutomaticPeekLockRenewalEnabled && _messageLockRenewers.TryRemove(messageId, out var updatedMessage)
-                ? updatedMessage.PopReceipt
+            //if the message has been Automatic renewed, the popreceipt might have changed since setup
+            var popReceipt = _messageLockRenewers.TryRemove(messageId, out var renewer)
+                ? renewer.PopReceipt
                 : cloudQueueMessage.PopReceipt;
 
             try
@@ -257,9 +230,7 @@ public class AzureStorageQueuesTransport : ITransport, IInitializable, IDisposab
                 // ReSharper disable once MethodSupportsCancellation
                 await inputQueue.DeleteMessageAsync(
                     messageId: messageId,
-                    popReceipt: popReceipt,
-                    options: ExponentialRetryRequestOptions,
-                    operationContext: new OperationContext()
+                    popReceipt: popReceipt
                 );
             }
             catch (Exception exception)
@@ -268,17 +239,20 @@ public class AzureStorageQueuesTransport : ITransport, IInitializable, IDisposab
             }
         });
 
-        context.OnAborted(ctx =>
+        context.OnAborted(_ =>
         {
-            const MessageUpdateFields fields = MessageUpdateFields.Visibility;
             var visibilityTimeout = TimeSpan.FromSeconds(0);
-            _messageLockRenewers.TryRemove(messageId, out _);
+
+            var popReceipt = _messageLockRenewers.TryRemove(messageId, out var renewer)
+                ? renewer.PopReceipt
+                : cloudQueueMessage.PopReceipt;
+
             AsyncHelpers.RunSync(async () =>
             {
                 // ignore if this fails
                 try
                 {
-                    await inputQueue.UpdateMessageAsync(cloudQueueMessage, visibilityTimeout, fields);
+                    await inputQueue.UpdateMessageAsync(cloudQueueMessage.MessageId, popReceipt, visibilityTimeout: visibilityTimeout);
                 }
                 catch { }
             });
@@ -325,7 +299,7 @@ public class AzureStorageQueuesTransport : ITransport, IInitializable, IDisposab
         return difference;
     }
 
-    static CloudQueueMessage Serialize(Dictionary<string, string> headers, byte[] body)
+    static BinaryData Serialize(Dictionary<string, string> headers, byte[] body)
     {
         var cloudStorageQueueTransportMessage = new CloudStorageQueueTransportMessage
         {
@@ -333,12 +307,12 @@ public class AzureStorageQueuesTransport : ITransport, IInitializable, IDisposab
             Body = body
         };
 
-        return new CloudQueueMessage(JsonConvert.SerializeObject(cloudStorageQueueTransportMessage));
+        return BinaryData.FromObjectAsJson(cloudStorageQueueTransportMessage);
     }
 
-    static TransportMessage Deserialize(CloudQueueMessage cloudQueueMessage)
+    static TransportMessage Deserialize(BinaryData cloudQueueMessage)
     {
-        var cloudStorageQueueTransportMessage = JsonConvert.DeserializeObject<CloudStorageQueueTransportMessage>(cloudQueueMessage.AsString);
+        var cloudStorageQueueTransportMessage = cloudQueueMessage.ToObjectFromJson<CloudStorageQueueTransportMessage>();
 
         return new TransportMessage(cloudStorageQueueTransportMessage.Headers, cloudStorageQueueTransportMessage.Body);
     }
@@ -377,7 +351,7 @@ public class AzureStorageQueuesTransport : ITransport, IInitializable, IDisposab
     {
         AsyncHelpers.RunSync(async () =>
         {
-            var queue = await _queueFactory.GetQueue(Address);
+            var queue = await _queueClientFactory.GetQueue(Address);
 
             if (!await queue.ExistsAsync()) return;
 
@@ -385,7 +359,7 @@ public class AzureStorageQueuesTransport : ITransport, IInitializable, IDisposab
 
             try
             {
-                await queue.ClearAsync(ExponentialRetryRequestOptions, new OperationContext());
+                await queue.ClearMessagesAsync();
             }
             catch (Exception exception)
             {
