@@ -3,11 +3,11 @@
 		<TargetFrameworks>net6.0</TargetFrameworks>
 	</PropertyGroup>
 	<ItemGroup>
-		<PackageReference Include="microsoft.net.test.sdk" Version="16.8.0" />
-		<PackageReference Include="nunit" Version="3.12.0" />
-		<PackageReference Include="nunit3testadapter" Version="3.17.0" />
-		<PackageReference Include="rebus" Version="6.0.0" />
-		<PackageReference Include="rebus.tests.contracts" Version="6.0.0" />
+		<PackageReference Include="microsoft.net.test.sdk" Version="17.3.2" />
+		<PackageReference Include="nunit" Version="3.13.3" />
+		<PackageReference Include="nunit3testadapter" Version="4.3.0" />
+		<PackageReference Include="rebus" Version="6.6.5" />
+		<PackageReference Include="rebus.tests.contracts" Version="6.5.0" />
 	</ItemGroup>
 	<ItemGroup>
 		<ProjectReference Include="..\Rebus.AzureQueues\Rebus.AzureQueues.csproj" />

@@ -9,6 +9,7 @@ using Rebus.Tests.Contracts;
 using Rebus.Tests.Contracts.Extensions;
 using Rebus.Time;
 using Rebus.Timeouts;
+#pragma warning disable CS1998
 
 // ReSharper disable ArgumentsStyleNamedExpression
 
