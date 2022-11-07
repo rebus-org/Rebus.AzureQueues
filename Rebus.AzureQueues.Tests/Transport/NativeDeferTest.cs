@@ -18,8 +18,9 @@ namespace Rebus.AzureQueues.Tests.Transport;
 public class NativeDeferTest : FixtureBase
 {
     static readonly string QueueName = TestConfig.GetName("input");
+
     BuiltinHandlerActivator _activator;
-    IBus _bus;
+    IBusStarter _busStarter;
 
     protected override void SetUp()
     {
@@ -27,14 +28,14 @@ public class NativeDeferTest : FixtureBase
 
         Using(_activator);
 
-        _bus = Configure.With(_activator)
+        _busStarter = Configure.With(_activator)
             .Transport(t => t.UseAzureStorageQueues(AzureConfig.ConnectionString, QueueName))
             .Routing(r => r.TypeBased().Map<TimedMessage>(QueueName))
             .Options(o =>
             {
                 o.LogPipeline();
             })
-            .Start();
+            .Create();
     }
 
     [Test]
@@ -53,9 +54,11 @@ public class NativeDeferTest : FixtureBase
             done.Set();
         });
 
+        var bus = _busStarter.Start();
+
         var sendTime = DateTimeOffset.Now;
 
-        await _bus.Defer(TimeSpan.FromSeconds(5), new TimedMessage { Time = sendTime });
+        await bus.Defer(TimeSpan.FromSeconds(5), new TimedMessage { Time = sendTime });
 
         done.WaitOrDie(TimeSpan.FromSeconds(8), "Did not receive 5s-deferred message within 8 seconds of waiting....");
 
