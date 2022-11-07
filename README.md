@@ -10,10 +10,12 @@ It's just
 ```csharp
 var storageAccount = CloudStorageAccount.Parse(connectionString);
 
-Configure.With(...)
-	.Transport(t => t.UseAzureStorageQueues(storageAccount, "your_queue"))
-	.(...)
-	.Start();
+services.AddRebus(
+	configure => configure
+		.Transport(t => t.UseAzureStorageQueues(storageAccount, "your_queue"))
+		.(...)
+);
+
 ```
 
 or
@@ -21,10 +23,11 @@ or
 ```csharp
 var storageAccount = CloudStorageAccount.Parse(connectionString);
 
-var bus Configure.With(...)
-	.Transport(t => t.UseAzureStorageQueuesAsOneWayClient(storageAccount))
-	.(...)
-	.Start();
+services.AddRebus(
+	configure => configure
+		.Transport(t => t.UseAzureStorageQueuesAsOneWayClient(storageAccount))
+		.(...)
+);
 ```
 
 and off you go! :rocket:

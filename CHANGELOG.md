@@ -26,7 +26,7 @@
 * Only target .NET Standard 2.0
 * Add ability to automatically renew peek locks - thanks [hdrachmann]
 
-## 3.0.0-b1
+## 3.0.0
 * Switch to Azure.Storage.Queues
 
 
