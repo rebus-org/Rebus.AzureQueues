@@ -90,7 +90,7 @@ public class AzureStorageQueuesTransport : ITransport, IInitializable, IDisposab
         {
             var messagesToSend = new ConcurrentQueue<MessageToSend>();
 
-            context.OnCommitted(_ =>
+            context.OnCommit(_ =>
             {
                 var messagesByQueue = messagesToSend
                     .GroupBy(m => m.DestinationAddress)
@@ -217,7 +217,7 @@ public class AzureStorageQueuesTransport : ITransport, IInitializable, IDisposab
     {
         var messageId = cloudQueueMessage.MessageId;
 
-        context.OnCompleted(async _ =>
+        context.OnAck(async _ =>
         {
             //if the message has been Automatic renewed, the popreceipt might have changed since setup
             var popReceipt = _messageLockRenewers.TryRemove(messageId, out var renewer)
@@ -239,7 +239,7 @@ public class AzureStorageQueuesTransport : ITransport, IInitializable, IDisposab
             }
         });
 
-        context.OnAborted(_ =>
+        context.OnNack(async _ =>
         {
             var visibilityTimeout = TimeSpan.FromSeconds(0);
 
@@ -247,15 +247,12 @@ public class AzureStorageQueuesTransport : ITransport, IInitializable, IDisposab
                 ? renewer.PopReceipt
                 : cloudQueueMessage.PopReceipt;
 
-            AsyncHelpers.RunSync(async () =>
+            // ignore if this fails
+            try
             {
-                // ignore if this fails
-                try
-                {
-                    await inputQueue.UpdateMessageAsync(cloudQueueMessage.MessageId, popReceipt, visibilityTimeout: visibilityTimeout);
-                }
-                catch { }
-            });
+                await inputQueue.UpdateMessageAsync(cloudQueueMessage.MessageId, popReceipt, visibilityTimeout: visibilityTimeout);
+            }
+            catch { }
         });
 
         context.OnDisposed(ctx => _messageLockRenewers.TryRemove(messageId, out _));

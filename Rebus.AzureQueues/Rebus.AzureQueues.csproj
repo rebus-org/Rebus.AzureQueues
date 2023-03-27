@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
 		<RootNamespace>Rebus</RootNamespace>
-		<LangVersion>10</LangVersion>
+		<LangVersion>11</LangVersion>
 		<TargetFramework>netstandard2.0</TargetFramework>
 		<Authors>mookid8000</Authors>
 		<PackageProjectUrl>https://rebus.fm/what-is-rebus/</PackageProjectUrl>
@@ -14,8 +14,8 @@
 		<PackageIcon>little_rebusbus2_copy-500x500.png</PackageIcon>
 	</PropertyGroup>
 	<ItemGroup>
-		<PackageReference Include="Azure.Storage.Queues" Version="12.12.0" />
-		<PackageReference Include="rebus" Version="6.0.0" />
+		<PackageReference Include="Azure.Storage.Queues" Version="12.13.1" />
+		<PackageReference Include="rebus" Version="8.0.0-alpha01" />
 	</ItemGroup>
 	<ItemGroup>
 		<None Include="..\artwork\little_rebusbus2_copy-500x500.png">

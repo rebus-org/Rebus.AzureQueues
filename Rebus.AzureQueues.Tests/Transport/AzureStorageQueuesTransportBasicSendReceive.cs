@@ -8,5 +8,4 @@ namespace Rebus.AzureQueues.Tests.Transport;
 [TestFixture]
 public class AzureStorageQueuesTransportBasicSendReceive : BasicSendReceive<AzureStorageQueuesTransportFactory>
 {
-    protected override TransportBehavior Behavior => new(ReturnsNullWhenQueueIsEmpty: true);
 }

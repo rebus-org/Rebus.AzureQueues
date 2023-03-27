@@ -29,6 +29,9 @@
 ## 3.0.0
 * Switch to Azure.Storage.Queues
 
+## 4.0.0-alpha01
+* Update to Rebus 8
+
 
 [asleire]: https://github.com/asleire
 [hdrachmann]: https://github.com/hdrachmann
