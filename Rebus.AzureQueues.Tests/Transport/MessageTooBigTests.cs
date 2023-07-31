@@ -59,7 +59,7 @@ namespace Rebus.AzureQueues.Tests.Transport
                 }))
                 .Options(o =>
                 {
-                    o.SimpleRetryStrategy(errorQueueName);
+                    o.RetryStrategy(errorQueueName);
                     o.SetNumberOfWorkers(1);
                     o.SetMaxParallelism(1);
                 })
