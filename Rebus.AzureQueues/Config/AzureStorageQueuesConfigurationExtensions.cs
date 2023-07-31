@@ -1,6 +1,8 @@
 ﻿using System;
+using Azure.Core;
 using Azure.Storage.Queues;
 using Rebus.AzureQueues;
+using Rebus.AzureQueues.Internals;
 using Rebus.AzureQueues.Transport;
 using Rebus.Logging;
 using Rebus.Pipeline;
@@ -32,6 +34,31 @@ Configure.With(...)
     })
     .(...)
     .Start();";
+
+        /// <summary>
+        /// Configures Rebus to use Azure Storage Queues to transport messages as a one-way client (i.e. will not be able to receive any messages)
+        /// </summary>
+        public static void UseAzureStorageQueuesAsOneWayClient(this StandardConfigurer<ITransport> configurer, Uri serviceEndpointUri, TokenCredential tokenCredential, AzureStorageQueuesTransportOptions options = null)
+        {
+            if (configurer == null) throw new ArgumentNullException(nameof(configurer));
+            if (tokenCredential == null) throw new ArgumentNullException(nameof(tokenCredential));
+
+            Register(configurer, null, new AzureTokenCredentialQueueClientFactory(tokenCredential, serviceEndpointUri), options);
+
+            OneWayClientBackdoor.ConfigureOneWayClient(configurer);
+        }
+
+        /// <summary>
+        /// Configures Rebus to use Azure Storage Queues to transport messages
+        /// </summary>
+        public static void UseAzureStorageQueues(this StandardConfigurer<ITransport> configurer, Uri serviceEndpointUri, TokenCredential tokenCredential, string inputQueueAddress, AzureStorageQueuesTransportOptions options = null)
+        {
+            if (configurer == null) throw new ArgumentNullException(nameof(configurer));
+            if (tokenCredential == null) throw new ArgumentNullException(nameof(tokenCredential));
+            if (inputQueueAddress == null) throw new ArgumentNullException(nameof(inputQueueAddress));
+
+            Register(configurer, inputQueueAddress, new AzureTokenCredentialQueueClientFactory(tokenCredential, serviceEndpointUri), options);
+        }
 
         /// <summary>
         /// Configures Rebus to use Azure Storage Queues to transport messages as a one-way client (i.e. will not be able to receive any messages)
