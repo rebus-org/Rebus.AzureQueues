@@ -29,6 +29,8 @@
 ## 3.0.0
 * Switch to Azure.Storage.Queues
 
+## 3.1.0
+* Fix ability to use native defer without relying on own input queue (and thus fix the error that made one-way clients unable to use native defer)
 
 [asleire]: https://github.com/asleire
 [hdrachmann]: https://github.com/hdrachmann

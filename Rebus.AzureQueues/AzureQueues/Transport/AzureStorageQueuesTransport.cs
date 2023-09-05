@@ -29,6 +29,11 @@ namespace Rebus.AzureQueues.Transport;
 /// </summary>
 public class AzureStorageQueuesTransport : ITransport, IInitializable, IDisposable
 {
+    /// <summary>
+    /// External timeout manager address set to this magic address will be routed to the destination address specified by the <see cref="Headers.DeferredRecipient"/> header
+    /// </summary>
+    public const string MagicDeferredMessagesAddress = "___deferred___";
+
     const string QueueNameValidationRegex = "^[a-z0-9](?!.*--)[a-z0-9-]{1,61}[a-z0-9]$";
     readonly ConcurrentDictionary<string, MessageLockRenewer> _messageLockRenewers = new();
     readonly ConcurrentQueue<QueueMessage> _prefetchedMessages = new();
@@ -129,9 +134,34 @@ public class AzureStorageQueuesTransport : ITransport, IInitializable, IDisposab
             return messagesToSend;
         });
 
-        var messageToSend = new MessageToSend(destinationAddress, transportMessage.Headers, transportMessage.Body);
+        var messageToSend = GetMessageToSend(destinationAddress, transportMessage);
 
         outgoingMessages.Enqueue(messageToSend);
+    }
+
+    static MessageToSend GetMessageToSend(string destinationAddress, TransportMessage transportMessage)
+    {
+        var headers = transportMessage.Headers;
+
+        if (destinationAddress == MagicDeferredMessagesAddress)
+        {
+            var actualDestinationAddress = headers.GetValueOrNull(Headers.DeferredRecipient)
+                                           ?? throw new ArgumentException($"Message was deferred, but the '{Headers.DeferredRecipient}' header could not be found. When a message is sent 'into the future', the '{Headers.DeferredRecipient}' header must indicate which queue to deliver the message after the delay has passed, and the '{Headers.DeferredUntil}' header must indicate the earliest time of when the message must be delivered.");
+
+            if (!headers.ContainsKey(Headers.DeferredUntil))
+            {
+                throw new ArgumentException(
+                    $"Message was deferred, but the '{Headers.DeferredUntil}' header could not be found. When a message is sent 'into the future', the '{Headers.DeferredRecipient}' header must indicate which queue to deliver the message after the delay has passed, and the '{Headers.DeferredUntil}' header must indicate the earliest time of when the message must be delivered.");
+            }
+
+            var clone = headers.Clone();
+            
+            clone.Remove(Headers.DeferredRecipient);
+
+            return new MessageToSend(actualDestinationAddress, clone, transportMessage.Body);
+        }
+
+        return new MessageToSend(destinationAddress, headers, transportMessage.Body);
     }
 
     class MessageToSend
