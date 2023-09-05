@@ -29,7 +29,10 @@
 ## 3.0.0
 * Switch to Azure.Storage.Queues
 
-## 4.0.0-alpha02
+## 3.1.0
+* Fix ability to use native defer without relying on own input queue (and thus fix the error that made one-way clients unable to use native defer)
+
+## 4.0.0-alpha03
 * Update to Rebus 8
 * Add configuration overloads to enable passing a `TokenCredential` and a `Uri` instead of a connection string, thus enabling the use of managed identities etc. - thanks [mirandaasm]
 

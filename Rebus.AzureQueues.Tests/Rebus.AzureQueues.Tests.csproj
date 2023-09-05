@@ -6,7 +6,7 @@
 		<PackageReference Include="microsoft.net.test.sdk" Version="17.6.3" />
 		<PackageReference Include="nunit" Version="3.13.3" />
 		<PackageReference Include="nunit3testadapter" Version="4.5.0" />
-		<PackageReference Include="rebus.tests.contracts" Version="8.0.0-alpha01" />
+		<PackageReference Include="rebus.tests.contracts" Version="8.0.0-alpha09" />
 	</ItemGroup>
 	<ItemGroup>
 		<ProjectReference Include="..\Rebus.AzureQueues\Rebus.AzureQueues.csproj" />

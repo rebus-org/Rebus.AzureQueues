@@ -129,6 +129,13 @@ Configure.With(...)
                     return new PipelineStepRemover(pipeline)
                         .RemoveIncomingStep(s => s.GetType() == typeof(HandleDeferredMessagesStep));
                 });
+
+                configurer.OtherService<Options>().Decorate(c =>
+                {
+                    var rebusOptions = c.Get<Options>();
+                    rebusOptions.ExternalTimeoutManagerAddressOrNull = AzureStorageQueuesTransport.MagicDeferredMessagesAddress;
+                    return rebusOptions;
+                });
             }
         }
     }

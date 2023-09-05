@@ -15,7 +15,7 @@
 	</PropertyGroup>
 	<ItemGroup>
 		<PackageReference Include="Azure.Storage.Queues" Version="12.15.0" />
-		<PackageReference Include="rebus" Version="8.0.0-alpha09" />
+		<PackageReference Include="rebus" Version="8.0.0-alpha11" />
 	</ItemGroup>
 	<ItemGroup>
 		<None Include="..\artwork\little_rebusbus2_copy-500x500.png">
