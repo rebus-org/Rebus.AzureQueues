@@ -12,15 +12,20 @@
 		<RepositoryType>git</RepositoryType>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<PackageIcon>little_rebusbus2_copy-500x500.png</PackageIcon>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
 	</PropertyGroup>
 	<ItemGroup>
-		<PackageReference Include="Azure.Storage.Queues" Version="12.15.0" />
-		<PackageReference Include="rebus" Version="8.0.0-alpha11" />
+		<PackageReference Include="Azure.Storage.Queues" Version="12.17.1" />
+		<PackageReference Include="rebus" Version="8.0.1" />
 	</ItemGroup>
 	<ItemGroup>
 		<None Include="..\artwork\little_rebusbus2_copy-500x500.png">
 			<Pack>True</Pack>
 			<PackagePath></PackagePath>
+		</None>
+		<None Include="..\README.md">
+		  <Pack>True</Pack>
+		  <PackagePath>\</PackagePath>
 		</None>
 	</ItemGroup>
 </Project>
