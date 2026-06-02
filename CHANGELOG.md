@@ -37,6 +37,10 @@
 * Add configuration overloads to enable passing a `TokenCredential` and a `Uri` instead of a connection string, thus enabling the use of managed identities etc. - thanks [mirandaasm]
 * Update Azure.Storage.Queues to 12.17.1
 
+## 4.1.0
+* Update to latest dependencies - thanks [simona-aveva]
+
 [asleire]: https://github.com/asleire
 [hdrachmann]: https://github.com/hdrachmann
 [mirandaasm]: https://github.com/mirandaasm
+[simona-aveva]: https://github.com/simona-aveva
