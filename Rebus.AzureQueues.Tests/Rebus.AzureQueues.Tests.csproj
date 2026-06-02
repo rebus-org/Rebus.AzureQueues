@@ -1,12 +1,13 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
-		<TargetFrameworks>net7.0</TargetFrameworks>
+		<TargetFrameworks>net8.0</TargetFrameworks>
+		<LangVersion>14</LangVersion>
 	</PropertyGroup>
 	<ItemGroup>
-		<PackageReference Include="microsoft.net.test.sdk" Version="17.8.0" />
-		<PackageReference Include="nunit" Version="3.14.0" />
-		<PackageReference Include="nunit3testadapter" Version="4.5.0" />
-		<PackageReference Include="rebus.tests.contracts" Version="8.0.1" />
+		<PackageReference Include="microsoft.net.test.sdk" Version="18.6.0" />
+		<PackageReference Include="nunit" Version="4.6.1" />
+		<PackageReference Include="nunit3testadapter" Version="6.2.0" />
+		<PackageReference Include="rebus.tests.contracts" Version="8.9.1" />
 	</ItemGroup>
 	<ItemGroup>
 		<ProjectReference Include="..\Rebus.AzureQueues\Rebus.AzureQueues.csproj" />
